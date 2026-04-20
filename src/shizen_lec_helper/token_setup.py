@@ -3,10 +3,10 @@
 Three public entry points:
   acquire_moodle_token(site_url, username, password)  -- core HTTP logic
   acquire_moodle_token_interactive(site_url)           -- prompts via input/getpass
-  acquire_moodle_token_from_file(site_url, creds_path) -- reads from .env-style file
+  acquire_moodle_token_from_file(site_url, username, creds_path)  -- reads password from file
 
-run_token_setup(site_url, config_dir)           -- interactive full flow
-run_token_setup_from_file(site_url, creds_path, config_dir) -- file-based full flow
+run_token_setup(site_url, config_dir)                              -- interactive full flow
+run_token_setup_from_file(site_url, username, creds_path, config_dir) -- file-based full flow
 """
 
 import getpass
@@ -161,73 +161,6 @@ def _read_password_file(file_path: str) -> str:
     return password
 
 
-def _parse_env_style_credentials(file_path: str) -> dict[str, str]:
-    """Parse a KEY=VALUE credentials file (dotenv-style).
-
-    Rules:
-    - Lines beginning with '#' (after stripping) are ignored as comments.
-    - Blank lines are ignored.
-    - Only the first '=' splits key from value.
-    - Leading/trailing whitespace around key and value is stripped.
-    - Surrounding quotes (single or double) on the value are removed.
-
-    Args:
-        file_path: Absolute path to the credentials file.
-
-    Returns:
-        Dictionary of key -> value pairs.
-
-    Raises:
-        ValueError: If a non-blank, non-comment line has no '='.
-    """
-    parsed: dict[str, str] = {}
-    with open(file_path, "r", encoding="utf-8") as fh:
-        for line in fh:
-            stripped = line.strip()
-            if not stripped or stripped.startswith("#"):
-                continue
-            if "=" not in stripped:
-                raise ValueError(
-                    f"Malformed credentials line (no '=' found): {stripped!r}"
-                )
-            key, _, raw_value = stripped.partition("=")
-            key = key.strip()
-            value = raw_value.strip()
-            # Remove surrounding single or double quotes
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in ('"', "'"):
-                value = value[1:-1]
-            parsed[key] = value
-    return parsed
-
-
-def _shred_and_delete_credentials_file(creds_path: str) -> None:
-    """Overwrite the credentials file with null bytes, fsync, then delete it.
-
-    This is a best-effort measure against simple disk forensics on
-    macOS/Linux regular filesystems. It does not guarantee secure erasure
-    on SSDs with wear-levelling or copy-on-write filesystems.
-
-    Args:
-        creds_path: Path to the credentials file to shred.
-    """
-    try:
-        file_size = os.path.getsize(creds_path)
-        null_bytes = b"\x00" * file_size
-        with open(creds_path, "r+b") as fh:
-            fh.write(null_bytes)
-            try:
-                os.fsync(fh.fileno())
-            except OSError as fsync_err:
-                logger.warning("fsync failed (best-effort): %s", fsync_err)
-    except OSError as overwrite_err:
-        logger.warning("Could not overwrite credentials file: %s", overwrite_err)
-
-    try:
-        os.unlink(creds_path)
-    except OSError as unlink_err:
-        logger.warning("Could not delete credentials file: %s", unlink_err)
-
-
 def _verify_credentials_file_security(creds_path: str) -> None:
     """Check that the credentials file is safe to read.
 
@@ -274,60 +207,52 @@ def _verify_credentials_file_security(creds_path: str) -> None:
 
 def acquire_moodle_token_from_file(
     site_url: str,
+    username: str,
     creds_path: str,
 ) -> MoodleToken:
-    """Obtain a Moodle token from a .env-style credentials file.
+    """Obtain a Moodle token using a username and a password file.
 
     Security steps:
     1. Validates file ownership and permissions (600 or tighter).
-    2. Reads SOS_USERNAME and SOS_PASSWORD without echoing to stdout.
+    2. Reads the password from the file (one line, whitespace stripped).
     3. Calls the Moodle token endpoint.
-    4. In try/finally: shreds and deletes the credentials file regardless of
-       success or failure.
+    4. On success only: deletes the password file.
+       On failure: leaves the file so the user can fix the password and retry.
 
     Args:
         site_url: Base URL of the Moodle site.
-        creds_path: Path to the credentials file (KEY=VALUE format).
+        username: Moodle login email/username (passed via CLI flag).
+        creds_path: Path to the password file (one line containing the password).
 
     Returns:
         MoodleToken populated with token, user_id, site_url, created_at.
 
     Raises:
-        RuntimeError: If required keys are missing or token acquisition fails.
+        RuntimeError: If token acquisition fails. File is NOT deleted on failure.
+        ValueError: If the password file is empty.
         SystemExit: If security checks fail (ownership / permissions).
     """
     _verify_credentials_file_security(creds_path)
+    password = _read_password_file(creds_path)
 
-    username: str = ""
-    password: str = ""
+    # Credentials intentionally not logged
+    print(f"\nMoodle token acquisition for: {site_url}")
+    print("Reading password from file (not displayed).\n")
 
     try:
-        creds = _parse_env_style_credentials(creds_path)
+        token = acquire_moodle_token(site_url, username, password)
+    except Exception:
+        # Do NOT delete on failure — the user may want to retry after fixing the password.
+        raise
 
-        if "SOS_USERNAME" not in creds:
-            raise RuntimeError(
-                f"SOS_USERNAME not found in credentials file: {creds_path}"
-            )
-        if "SOS_PASSWORD" not in creds:
-            raise RuntimeError(
-                f"SOS_PASSWORD not found in credentials file: {creds_path}"
-            )
+    # Success: delete the password file (plain unlink; shred is unnecessary here).
+    try:
+        os.unlink(creds_path)
+        print(f"Password file deleted: {creds_path}")
+    except OSError as unlink_err:
+        logger.warning("Could not delete password file: %s", unlink_err)
 
-        username = creds["SOS_USERNAME"]
-        password = creds["SOS_PASSWORD"]
-
-        # Credentials intentionally not logged
-        print(f"\nMoodle token acquisition for: {site_url}")
-        print("Reading credentials from file (username and password not displayed).\n")
-
-        return acquire_moodle_token(site_url, username, password)
-
-    finally:
-        # Clear credential variables from memory
-        password = "\x00" * max(len(password), 1)  # noqa: F841
-        username = "\x00" * max(len(username), 1)  # noqa: F841
-        # Shred and delete regardless of success or failure
-        _shred_and_delete_credentials_file(creds_path)
+    return token
 
 
 def _verify_token_and_get_user_id(site_url: str, token: str) -> int:
@@ -394,16 +319,19 @@ def run_token_setup(
 
 def run_token_setup_from_file(
     site_url: str,
+    username: str,
     creds_path: str,
     config_dir: "Path | str | None" = None,
 ) -> MoodleToken:
-    """Non-interactive full flow: read credentials from file, acquire token, save.
+    """Non-interactive full flow: read password from file, acquire token, save.
 
-    The credentials file is shredded and deleted regardless of success or failure.
+    The password file is deleted on success; left intact on failure so the
+    user can fix the password and retry.
 
     Args:
         site_url: Base URL of the Moodle site.
-        creds_path: Path to .env-style credentials file.
+        username: Moodle login email/username (from CLI flag).
+        creds_path: Path to the password file (one line).
         config_dir: Optional config directory override.
 
     Returns:
@@ -411,7 +339,7 @@ def run_token_setup_from_file(
     """
     from .config import make_config_paths
 
-    token = acquire_moodle_token_from_file(site_url, creds_path)
+    token = acquire_moodle_token_from_file(site_url, username, creds_path)
     token.save(config_dir)
     _resolved_dir, _cfg, token_path, _state = make_config_paths(config_dir)
     print(f"\nToken saved to {token_path}")

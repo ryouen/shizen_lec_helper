@@ -62,16 +62,20 @@ python -m shizen_lec_helper sync
 
 ## Moodleトークン取得（非対話モード）
 
-AIエージェントに手伝ってもらう場合、対話入力ができないので認証情報ファイル方式を使います:
+AIエージェントに手伝ってもらう場合は、パスワードファイル経由の方式を使います:
 
-1. `~/.shizen_lec_creds` を以下の内容でエディタで作成:
+1. パスワードを保存するファイルを作成:
+   エディタで `~/.shizen_lec_password` を開き、パスワードを1行だけ入力して保存
+2. パーミッション変更:
+   ```bash
+   chmod 600 ~/.shizen_lec_password
    ```
-   SOS_USERNAME=your.email@shizenkan.ac.jp
-   SOS_PASSWORD=your_password
+3. セットアップ実行（`EMAIL` は自分のMoodleアカウント）:
+   ```bash
+   python -m shizen_lec_helper setup --username EMAIL --creds-file ~/.shizen_lec_password
    ```
-2. パーミッション変更: `chmod 600 ~/.shizen_lec_creds`
-3. セットアップ実行: `python -m shizen_lec_helper setup --creds-file ~/.shizen_lec_creds`
-4. スクリプトが成功/失敗に関わらずファイルを上書き削除します
+4. 成功するとファイルが自動削除されます。失敗時は残るので、
+   パスワードを修正して再実行できます。
 
 詳細手順は `AI_SETUP.md` の「Step 4 方式A」を参照してください。
 
@@ -80,7 +84,7 @@ AIエージェントに手伝ってもらう場合、対話入力ができない
 | コマンド | 説明 |
 |---------|------|
 | `python -m shizen_lec_helper setup` | 初回セットアップ（対話型）|
-| `python -m shizen_lec_helper setup --creds-file PATH` | 初回セットアップ（非対話型）|
+| `python -m shizen_lec_helper setup --username EMAIL --creds-file PATH` | 初回セットアップ（非対話型）|
 | `python -m shizen_lec_helper sync` | 授業資料・動画を同期 |
 | `python -m shizen_lec_helper sync --dry-run` | DL対象の確認（書き込みなし） |
 | `python -m shizen_lec_helper deadlines` | 締切一覧＋`_deadlines.md`更新 |

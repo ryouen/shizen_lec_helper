@@ -38,6 +38,15 @@ def _cmd_setup(args: argparse.Namespace) -> int:
     config_dir: Path | None = args.config_dir
     base_path: Path | None = args.base_path
     creds_file: str | None = getattr(args, "creds_file", None)
+    username: str | None = getattr(args, "username", None)
+
+    # Validate mutual dependency: --username and --creds-file must appear together.
+    if bool(creds_file) != bool(username):
+        print(
+            "Error: --username and --creds-file must be specified together.",
+            file=sys.stderr,
+        )
+        return 1
 
     _cfg_dir, cfg_path, token_path, _state = make_config_paths(config_dir)
 
@@ -57,8 +66,10 @@ def _cmd_setup(args: argparse.Namespace) -> int:
         print("Use --force to re-acquire.\n")
     else:
         try:
-            if creds_file:
-                run_token_setup_from_file(site_url, creds_file, config_dir=config_dir)
+            if creds_file and username:
+                run_token_setup_from_file(
+                    site_url, username, creds_file, config_dir=config_dir
+                )
             else:
                 run_token_setup(site_url, config_dir=config_dir)
         except EOFError as e:
@@ -333,15 +344,26 @@ def build_argument_parser() -> argparse.ArgumentParser:
     setup_parser.add_argument("--force", action="store_true",
                                help="Re-run setup even if token/config already exist.")
     setup_parser.add_argument(
+        "--username",
+        metavar="EMAIL",
+        default=None,
+        help=(
+            "SOS (Moodle) username/email. Required when --creds-file is used. "
+            "Must be specified together with --creds-file."
+        ),
+    )
+    setup_parser.add_argument(
         "--creds-file",
         metavar="PATH",
         default=None,
         help=(
-            "Path to a .env-style credentials file containing SOS_USERNAME and "
-            "SOS_PASSWORD. Skips interactive prompts. The file must be owned by "
-            "you and have permissions 600 or tighter. It is shredded and deleted "
-            "after use regardless of success or failure. "
-            "Example: python -m shizen_lec_helper setup --creds-file ~/.shizen_lec_creds"
+            "Path to a file containing just the Moodle password (one line). "
+            "Skips interactive prompts. The file must be owned by you and have "
+            "permissions 600 or tighter. Deleted on success; kept on failure so "
+            "you can fix the password and retry. Must be specified together with "
+            "--username. "
+            "Example: python -m shizen_lec_helper setup "
+            "--username you@example.com --creds-file ~/.shizen_lec_password"
         ),
     )
 
