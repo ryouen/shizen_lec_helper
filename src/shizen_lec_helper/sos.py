@@ -4,6 +4,7 @@ Standalone version — no dependency on libs/core or shizenkan package.
 Uses only the standard library + requests.
 """
 
+import html
 import logging
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -163,7 +164,7 @@ class SOSClient:
                 assignments.append(MoodleAssignment(
                     id=a["id"],
                     course_id=cid,
-                    name=a["name"],
+                    name=html.unescape(a["name"]),
                     intro=a.get("intro", ""),
                     due_date=a.get("duedate", 0),
                     cutoff_date=a.get("cutoffdate", 0),

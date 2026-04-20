@@ -80,6 +80,36 @@ python -m shizen_lec_helper sync
 
 優先順位: CLIフラグ > 環境変数 > デフォルト
 
+## 締切一覧の出力イメージ
+
+`python -m shizen_lec_helper deadlines` を実行すると、2つの形式で締切が表示されます。
+
+**ターミナル出力:**
+
+```
+Course                    Days  Due                   Assignment
+--------------------------------------------------------------------------------
+SUSTAINABILITY_EN_2027       0d  2026-04-20 23:59 JST  Pre-session Assignments 2 !
+CORE_EN_2027                 5d  2026-04-26 12:00 JST  Post-assignment_worksheet 11
+ENVISION_EN_2027             6d  2026-04-26 23:59 JST  FINAL INDIVIDUAL REPORT
+SUSTAINABILITY_EN_2027      13d  2026-05-03 23:59 JST  Post-Class Assignment
+```
+
+`!` マーク: 締切まで2日以内。
+
+**Markdownファイル (`~/Shizenkan/_deadlines.md`):**
+
+| Course | Assignment | Due | Days Left |
+|--------|-----------|-----|----------|
+| SUSTAINABILITY_EN_2027 | 🔴 Pre-session Assignments 2 | 2026-04-20 23:59 JST | 0d |
+| CORE_EN_2027 | 🟡 Post-assignment_worksheet 11 | 2026-04-26 12:00 JST | 5d |
+| ENVISION_EN_2027 | 🟡 FINAL INDIVIDUAL REPORT | 2026-04-26 23:59 JST | 6d |
+| SUSTAINABILITY_EN_2027 | Post-Class Assignment | 2026-05-03 23:59 JST | 13d |
+
+色分け: 🔴 2日以内 / 🟡 7日以内 / 無印 8日以降（最大60日先まで表示）
+
+Obsidianやお好きなエディタで `_deadlines.md` を開いて常時参照できます。自分のAIに「このファイルを見て今週の優先順位を教えて」と渡すのも便利です。
+
 ## 保存先フォルダ構造
 
 ```
@@ -172,6 +202,36 @@ python -m shizen_lec_helper sync
 | `--base-path PATH` | `SLH_BASE_PATH` | `~/Shizenkan/` | Override download location |
 
 Precedence: CLI flag > env var > default
+
+## Deadline output examples
+
+Running `python -m shizen_lec_helper deadlines` produces two formats.
+
+**Terminal output:**
+
+```
+Course                    Days  Due                   Assignment
+--------------------------------------------------------------------------------
+SUSTAINABILITY_EN_2027       0d  2026-04-20 23:59 JST  Pre-session Assignments 2 !
+CORE_EN_2027                 5d  2026-04-26 12:00 JST  Post-assignment_worksheet 11
+ENVISION_EN_2027             6d  2026-04-26 23:59 JST  FINAL INDIVIDUAL REPORT
+SUSTAINABILITY_EN_2027      13d  2026-05-03 23:59 JST  Post-Class Assignment
+```
+
+`!` marks deadlines within 2 days.
+
+**Markdown file (`~/Shizenkan/_deadlines.md`):**
+
+| Course | Assignment | Due | Days Left |
+|--------|-----------|-----|----------|
+| SUSTAINABILITY_EN_2027 | 🔴 Pre-session Assignments 2 | 2026-04-20 23:59 JST | 0d |
+| CORE_EN_2027 | 🟡 Post-assignment_worksheet 11 | 2026-04-26 12:00 JST | 5d |
+| ENVISION_EN_2027 | 🟡 FINAL INDIVIDUAL REPORT | 2026-04-26 23:59 JST | 6d |
+| SUSTAINABILITY_EN_2027 | Post-Class Assignment | 2026-05-03 23:59 JST | 13d |
+
+Color coding: 🔴 within 2 days / 🟡 within 7 days / no marker from 8 days onward (up to 60 days).
+
+You can open `_deadlines.md` in Obsidian or any editor for always-visible reference. You can also pass the file to your AI: "Look at this file and tell me my priorities this week."
 
 ## Folder structure
 
