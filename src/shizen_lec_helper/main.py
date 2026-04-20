@@ -33,10 +33,11 @@ def _configure_logging(verbose: bool = False) -> None:
 def _cmd_setup(args: argparse.Namespace) -> int:
     """Run first-time setup: acquire token and generate config.json."""
     from .config import AppConfig, make_config_paths, DEFAULT_SITE_URL
-    from .token_setup import run_token_setup
+    from .token_setup import run_token_setup, run_token_setup_from_file
 
     config_dir: Path | None = args.config_dir
     base_path: Path | None = args.base_path
+    creds_file: str | None = getattr(args, "creds_file", None)
 
     _cfg_dir, cfg_path, token_path, _state = make_config_paths(config_dir)
 
@@ -56,7 +57,13 @@ def _cmd_setup(args: argparse.Namespace) -> int:
         print("Use --force to re-acquire.\n")
     else:
         try:
-            run_token_setup(site_url, config_dir=config_dir)
+            if creds_file:
+                run_token_setup_from_file(site_url, creds_file, config_dir=config_dir)
+            else:
+                run_token_setup(site_url, config_dir=config_dir)
+        except EOFError as e:
+            print(f"\n{e}", file=sys.stderr)
+            return 1
         except RuntimeError as e:
             print(f"\nError: {e}", file=sys.stderr)
             return 1
