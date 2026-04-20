@@ -51,14 +51,28 @@ EOF
 
 cd "$SCRIPT_DIR"
 
+# Use env vars to isolate from production config.
+# Avoids argparse parent/child conflict with --config-dir flag.
+export SLH_CONFIG_DIR="$TEST_CONFIG"
+export SLH_BASE_PATH="$TEST_BASE"
+
 echo "[4/6] Test: status"
-./run.sh --config-dir "$TEST_CONFIG" --base-path "$TEST_BASE" status
+./run.sh status
 
 echo "[5/6] Test: courses --auto-detect (Moodle API call)"
-./run.sh --config-dir "$TEST_CONFIG" --base-path "$TEST_BASE" courses --auto-detect
+./run.sh courses --auto-detect
 
-echo "[6/6] Test: sync --dry-run (list only, no downloads)"
-./run.sh --config-dir "$TEST_CONFIG" --base-path "$TEST_BASE" sync --dry-run
+echo "[6/6] Test: sync --dry-run (with one active course)"
+# Populate active_courses with one detected course to exercise sync path
+python3 <<PYEOF
+import json
+from pathlib import Path
+p = Path("$TEST_CONFIG/config.json")
+cfg = json.loads(p.read_text())
+cfg["active_courses"] = ["GUIDANCE_EN_2027"]
+p.write_text(json.dumps(cfg, indent=2))
+PYEOF
+./run.sh sync --dry-run
 
 echo ""
 echo "All smoke tests passed. Cleaning up..."
