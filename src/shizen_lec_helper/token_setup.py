@@ -2,7 +2,7 @@
 
 Prompts for username and password via getpass (never stored to disk),
 calls the Moodle token endpoint, verifies with site_info, and saves
-the token to ~/.config/shizenkan-lite/moodle-token.json.
+the token to ~/.config/shizen_lec_helper/moodle-token.json.
 """
 
 import getpass
@@ -135,12 +135,22 @@ def _verify_token_and_get_user_id(site_url: str, token: str) -> int:
     return user_id
 
 
-def run_token_setup(site_url: str = DEFAULT_SITE_URL) -> MoodleToken:
+def run_token_setup(site_url: str = DEFAULT_SITE_URL,
+                    config_dir: "Path | str | None" = None) -> MoodleToken:
     """Run the full token setup flow: acquire, verify, and save to disk.
 
-    Returns the saved MoodleToken.
+    Args:
+        site_url: Base URL of the Moodle site.
+        config_dir: Optional config directory override (from CLI --config-dir flag).
+
+    Returns:
+        The saved MoodleToken.
     """
+    from pathlib import Path
+    from .config import make_config_paths
+
     token = acquire_moodle_token(site_url)
-    token.save()
-    print(f"\nToken saved to ~/.config/shizenkan-lite/moodle-token.json")
+    token.save(config_dir)
+    resolved_dir, _cfg, token_path, _state = make_config_paths(config_dir)
+    print(f"\nToken saved to {token_path}")
     return token

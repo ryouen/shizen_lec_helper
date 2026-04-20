@@ -8,7 +8,7 @@
 - **パスワードは絶対にディスクに保存・ログ出力しないでください。** `token_setup.py` が `getpass` で入力を受け取り、メモリから即座に削除します。
 - **不明な点は1問ずつ聞かず、まとめて確認してください**（下記のインタビュー手順を参照）。
 - `~/.config/ai-agent/` 配下のファイルには一切触れないでください（別システムの認証情報が入っています）。
-- shizenkan-lite専用の設定は `~/.config/shizenkan-lite/` に保存します。
+- shizen_lec_helper専用の設定は `~/.config/shizen_lec_helper/` に保存します。
 
 ---
 
@@ -67,15 +67,15 @@ pip install -r requirements.txt
 ## Step 4: Moodleトークンの取得
 
 ```bash
-python -m shizenkan_lite setup
+python -m shizen_lec_helper setup
 ```
 
 このコマンドが以下を行います:
 1. SOSのメールアドレスとパスワードを `getpass` で入力（パスワードは画面に表示されません）
 2. Moodle APIでトークンを取得
 3. `core_webservice_get_site_info` で動作確認（ユーザー名・フルネームが表示されます）
-4. トークンを `~/.config/shizenkan-lite/moodle-token.json` に保存（パーミッション600）
-5. 設定ファイル `~/.config/shizenkan-lite/config.json` を生成
+4. トークンを `~/.config/shizen_lec_helper/moodle-token.json` に保存（パーミッション600）
+5. 設定ファイル `~/.config/shizen_lec_helper/config.json` を生成
 
 **パスワードはディスクに書き込まれません。**
 
@@ -84,7 +84,7 @@ python -m shizenkan_lite setup
 ## Step 5: アクティブコースの確認と設定
 
 ```bash
-python -m shizenkan_lite courses --auto-detect
+python -m shizen_lec_helper courses --auto-detect
 ```
 
 このコマンドが:
@@ -104,9 +104,9 @@ SOCIOLOGY_EN_2027              inactive   Social Systems Theory...
 
 設定の更新:
 ```bash
-# ~/.config/shizenkan-lite/config.json を編集して active_courses を設定
+# ~/.config/shizen_lec_helper/config.json を編集して active_courses を設定
 # または手動で編集:
-cat ~/.config/shizenkan-lite/config.json
+cat ~/.config/shizen_lec_helper/config.json
 ```
 
 ---
@@ -115,12 +115,12 @@ cat ~/.config/shizenkan-lite/config.json
 
 まずドライランで確認:
 ```bash
-python -m shizenkan_lite sync --dry-run
+python -m shizen_lec_helper sync --dry-run
 ```
 
 問題なければ本実行:
 ```bash
-python -m shizenkan_lite sync
+python -m shizen_lec_helper sync
 ```
 
 **初回は時間がかかることがあります（特に動画をDLする場合）。**
@@ -140,14 +140,14 @@ crontab -e
 
 追加する行:
 ```
-0 6 * * * cd /path/to/shizenkan-lite && ./run.sh sync >> ~/Shizenkan/sync.log 2>&1
+0 6 * * * cd /path/to/shizen_lec_helper && ./run.sh sync >> ~/Shizenkan/sync.log 2>&1
 ```
 
 ### Mac（必要な時だけ起動）の場合: ログイン時フック
 
 ```bash
 # ~/.zprofile または ~/.bash_profile に追加
-echo 'cd /path/to/shizenkan-lite && ./run.sh sync --dry-run 2>/dev/null &' >> ~/.zprofile
+echo 'cd /path/to/shizen_lec_helper && ./run.sh sync --dry-run 2>/dev/null &' >> ~/.zprofile
 ```
 
 または LaunchAgent を作成（詳しくはAIに相談してください）。
@@ -163,7 +163,7 @@ systemd user timerを設定してください。AIに相談してください。
 
 **Windows固有の注意:**
 - cronの代わりに「タスクスケジューラ」を使ってください
-- `run.sh` の代わりに `python -m shizenkan_lite` を直接使ってください
+- `run.sh` の代わりに `python -m shizen_lec_helper` を直接使ってください
 - ffmpegのインストール: https://ffmpeg.org/download.html または `winget install ffmpeg`
 
 **Linux固有の注意:**
@@ -190,7 +190,7 @@ Could not reach Moodle server
 
 再試行:
 ```bash
-python -m shizenkan_lite setup --force
+python -m shizen_lec_helper setup --force
 ```
 
 ### ダウンロードが途中で止まる
@@ -226,13 +226,13 @@ sudo apt install ffmpeg
 ### 動画のパスワードが違うと言われる
 
 動画URLのパスワードはSOS（Moodle）の授業ページに記載されています。
-`python -m shizenkan_lite courses` でコース一覧を確認し、SOSのページで最新のパスワードを確認してください。
+`python -m shizen_lec_helper courses` でコース一覧を確認し、SOSのページで最新のパスワードを確認してください。
 
 ---
 
 ## 設定ファイルのリファレンス
 
-`~/.config/shizenkan-lite/config.json`:
+`~/.config/shizen_lec_helper/config.json`:
 
 | キー | 型 | デフォルト | 説明 |
 |-----|-----|---------|------|
@@ -249,7 +249,7 @@ sudo apt install ffmpeg
 
 - **パスワードはディスクに保存されません。** `setup` コマンドでのみ使用し、メモリから即削除します。
 - **トークンファイルは `chmod 600` で保護されます。** 自分のユーザーのみ読める設定です。
-- **`~/.config/shizenkan-lite/` 配下のファイルは機密情報です。** バックアップ時は注意してください。
+- **`~/.config/shizen_lec_helper/` 配下のファイルは機密情報です。** バックアップ時は注意してください。
 
 ---
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run.sh — CLI wrapper for shizenkan-lite
+# run.sh — CLI wrapper for shizen_lec_helper
 #
 # Usage:
 #   ./run.sh sync
@@ -8,6 +8,7 @@
 #   ./run.sh status
 #   ./run.sh courses --auto-detect
 #   ./run.sh setup
+#   ./run.sh --config-dir /tmp/slh_test/config --base-path /tmp/slh_test/Shizenkan status
 #
 # This script resolves the Python interpreter and PYTHONPATH automatically,
 # so it works whether you use a venv, uv, or plain system Python.
@@ -28,4 +29,4 @@ fi
 
 # --- Run ---
 export PYTHONPATH="$SCRIPT_DIR/src:${PYTHONPATH:-}"
-exec $PYTHON -m shizenkan_lite "$@"
+exec $PYTHON -m shizen_lec_helper "$@"

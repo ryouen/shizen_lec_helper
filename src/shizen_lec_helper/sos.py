@@ -78,10 +78,12 @@ class SOSClient:
     Standalone version using requests (not httpx).
     """
 
-    def __init__(self, token: MoodleToken | None = None):
-        self._token = token or MoodleToken.load()
+    def __init__(self, token: MoodleToken | None = None,
+                 config_dir: "Path | str | None" = None):
+        from pathlib import Path
+        self._token = token or MoodleToken.load(config_dir=config_dir)
         self._session = requests.Session()
-        self._session.headers.update({"User-Agent": "shizenkan-lite/0.1.0"})
+        self._session.headers.update({"User-Agent": "shizen_lec_helper/0.1.0"})
         self._api_url = moodle_api_endpoint(self._token.site_url)
 
     def _call(self, function: str, **params: Any) -> Any:

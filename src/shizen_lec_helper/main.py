@@ -1,4 +1,4 @@
-"""CLI entry point for shizenkan-lite.
+"""CLI entry point for shizen_lec_helper.
 
 Commands:
   setup      - First-time setup: obtain Moodle token and generate config
@@ -6,6 +6,10 @@ Commands:
   deadlines  - Show upcoming deadlines and update _deadlines.md
   status     - Show config, last sync time, disk usage
   courses    - List enrolled courses with active/inactive classification
+
+Global flags (available before any subcommand):
+  --config-dir PATH   Override default ~/.config/shizen_lec_helper/ (also SLH_CONFIG_DIR env)
+  --base-path PATH    Override default ~/Shizenkan/ (also SLH_BASE_PATH env)
 """
 
 import argparse
@@ -28,26 +32,31 @@ def _configure_logging(verbose: bool = False) -> None:
 
 def _cmd_setup(args: argparse.Namespace) -> int:
     """Run first-time setup: acquire token and generate config.json."""
-    from .config import AppConfig, CONFIG_DIR, CONFIG_PATH, TOKEN_PATH, DEFAULT_SITE_URL
+    from .config import AppConfig, make_config_paths, DEFAULT_SITE_URL
     from .token_setup import run_token_setup
 
-    print("=== shizenkan-lite setup ===\n")
+    config_dir: Path | None = args.config_dir
+    base_path: Path | None = args.base_path
+
+    _cfg_dir, cfg_path, token_path, _state = make_config_paths(config_dir)
+
+    print("=== shizen_lec_helper setup ===\n")
 
     # --- Step 1: Moodle token ---
     site_url = DEFAULT_SITE_URL
-    if CONFIG_PATH.exists():
+    if cfg_path.exists():
         try:
-            cfg = AppConfig.load()
+            cfg = AppConfig.load(config_dir=config_dir)
             site_url = cfg.site_url
         except Exception:
             pass
 
-    if TOKEN_PATH.exists() and not args.force:
-        print(f"Token already exists at {TOKEN_PATH}")
+    if token_path.exists() and not args.force:
+        print(f"Token already exists at {token_path}")
         print("Use --force to re-acquire.\n")
     else:
         try:
-            run_token_setup(site_url)
+            run_token_setup(site_url, config_dir=config_dir)
         except RuntimeError as e:
             print(f"\nError: {e}", file=sys.stderr)
             return 1
@@ -56,18 +65,18 @@ def _cmd_setup(args: argparse.Namespace) -> int:
             return 1
 
     # --- Step 2: Config file ---
-    if CONFIG_PATH.exists() and not args.force:
-        print(f"Config already exists at {CONFIG_PATH}")
+    if cfg_path.exists() and not args.force:
+        print(f"Config already exists at {cfg_path}")
         print("Use --force to regenerate.\n")
     else:
-        config = AppConfig()
-        config.save()
-        print(f"Config file created at: {CONFIG_PATH}")
+        config = AppConfig(base_path=base_path or AppConfig().base_path)
+        config.save(config_dir=config_dir)
+        print(f"Config file created at: {cfg_path}")
         print("\nNext steps:")
-        print("  1. Run: python -m shizenkan_lite courses")
+        print("  1. Run: python -m shizen_lec_helper courses")
         print("     (to see your enrolled courses and auto-detect active ones)")
         print("  2. Edit active_courses in config.json")
-        print("  3. Run: python -m shizenkan_lite sync")
+        print("  3. Run: python -m shizen_lec_helper sync")
 
     return 0
 
@@ -80,19 +89,22 @@ def _cmd_sync(args: argparse.Namespace) -> int:
     from .video import download_course_videos, check_ytdlp_available
     from .state import update_last_sync_timestamp
 
-    config = AppConfig.load()
+    config_dir: Path | None = args.config_dir
+    base_path: Path | None = args.base_path
+
+    config = AppConfig.load(config_dir=config_dir, base_path_override=base_path)
 
     if not config.active_courses:
-        print("No active_courses configured. Run `python -m shizenkan_lite courses` first.")
+        print("No active_courses configured. Run `python -m shizen_lec_helper courses` first.")
         return 1
 
     dry_run = args.dry_run
     if dry_run:
         print("[DRY RUN] No files will be written.\n")
 
-    with SOSClient() as sos:
+    with SOSClient(config_dir=config_dir) as sos:
         # File sync
-        result = sync_active_courses(sos, config, dry_run=dry_run)
+        result = sync_active_courses(sos, config, dry_run=dry_run, config_dir=config_dir)
 
         print(f"\nFile sync complete:")
         print(f"  Downloaded: {result.total_downloaded}")
@@ -130,7 +142,7 @@ def _cmd_sync(args: argparse.Namespace) -> int:
                           f"failed={video_stats['failed']}")
 
     if not dry_run:
-        update_last_sync_timestamp()
+        update_last_sync_timestamp(config_dir=config_dir)
 
     return 0 if not result.all_errors else 1
 
@@ -141,10 +153,13 @@ def _cmd_deadlines(args: argparse.Namespace) -> int:
     from .sos import SOSClient
     from .deadlines import fetch_upcoming_deadlines, write_deadlines_markdown, print_deadlines_table
 
-    config = AppConfig.load()
+    config_dir: Path | None = args.config_dir
+    base_path: Path | None = args.base_path
+
+    config = AppConfig.load(config_dir=config_dir, base_path_override=base_path)
     dry_run = args.dry_run
 
-    with SOSClient() as sos:
+    with SOSClient(config_dir=config_dir) as sos:
         deadlines = fetch_upcoming_deadlines(sos, config)
 
     print_deadlines_table(deadlines)
@@ -158,20 +173,25 @@ def _cmd_deadlines(args: argparse.Namespace) -> int:
 
 def _cmd_status(args: argparse.Namespace) -> int:
     """Show configuration summary, last sync time, and disk usage."""
-    from .config import AppConfig, CONFIG_PATH, TOKEN_PATH
-    from .state import get_sync_stats, get_last_sync_timestamp
+    from .config import AppConfig, make_config_paths
+    from .state import get_sync_stats
 
-    print("=== shizenkan-lite status ===\n")
+    config_dir: Path | None = args.config_dir
+    base_path: Path | None = args.base_path
+
+    _cfg_dir, cfg_path, token_path, _state = make_config_paths(config_dir)
+
+    print("=== shizen_lec_helper status ===\n")
 
     # Config
-    config_exists = CONFIG_PATH.exists()
-    token_exists = TOKEN_PATH.exists()
-    print(f"Config file : {'OK  ' if config_exists else 'MISSING'} ({CONFIG_PATH})")
-    print(f"Token file  : {'OK  ' if token_exists else 'MISSING'} ({TOKEN_PATH})")
+    config_exists = cfg_path.exists()
+    token_exists = token_path.exists()
+    print(f"Config file : {'OK  ' if config_exists else 'MISSING'} ({cfg_path})")
+    print(f"Token file  : {'OK  ' if token_exists else 'MISSING'} ({token_path})")
 
     if config_exists:
         try:
-            config = AppConfig.load()
+            config = AppConfig.load(config_dir=config_dir, base_path_override=base_path)
             print(f"\nSite URL    : {config.site_url}")
             print(f"Base path   : {config.base_path}")
             print(f"Active courses ({len(config.active_courses)}):")
@@ -181,10 +201,10 @@ def _cmd_status(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"  (Could not load config: {e})")
     else:
-        print("\nRun `python -m shizenkan_lite setup` to configure.")
+        print("\nRun `python -m shizen_lec_helper setup` to configure.")
 
     # Sync stats
-    stats = get_sync_stats()
+    stats = get_sync_stats(config_dir=config_dir)
     last_sync = stats.get("last_sync") or "Never"
     total_files = stats.get("total_files", 0)
     total_mb = stats.get("total_size_bytes", 0) / (1024 * 1024)
@@ -194,7 +214,7 @@ def _cmd_status(args: argparse.Namespace) -> int:
     # Disk usage of base_path
     if config_exists:
         try:
-            cfg = AppConfig.load()
+            cfg = AppConfig.load(config_dir=config_dir, base_path_override=base_path)
             base = cfg.base_path.expanduser()
             if base.exists():
                 import shutil as _shutil
@@ -209,15 +229,18 @@ def _cmd_status(args: argparse.Namespace) -> int:
 
 def _cmd_courses(args: argparse.Namespace) -> int:
     """List enrolled courses with active/inactive classification."""
-    from .config import AppConfig
+    from .config import AppConfig, make_config_paths
     from .sos import SOSClient
     from .deadlines import determine_active_courses
 
-    config = AppConfig.load()
+    config_dir: Path | None = args.config_dir
+    base_path: Path | None = args.base_path
+
+    config = AppConfig.load(config_dir=config_dir, base_path_override=base_path)
 
     print("Fetching enrolled courses from SOS...\n")
 
-    with SOSClient() as sos:
+    with SOSClient(config_dir=config_dir) as sos:
         enrolled = sos.get_courses()
 
         if not enrolled:
@@ -238,45 +261,102 @@ def _cmd_courses(args: argparse.Namespace) -> int:
             print(f"{course.shortname:<30} {status:<10} {course.fullname}")
 
     if args.auto_detect:
+        _cfg_dir, cfg_path, _tok, _state = make_config_paths(config_dir)
         print(f"\nAuto-detected active courses: {active_shortnames}")
         print("\nTo use these, add them to active_courses in:")
-        print(f"  ~/.config/shizenkan-lite/config.json")
+        print(f"  {cfg_path}")
 
     return 0
 
 
+def _build_isolation_flags_parser() -> argparse.ArgumentParser:
+    """Build a shared parent parser containing the isolation flags.
+
+    Using add_help=False so it can be used as a parent without duplicate -h.
+    """
+    shared = argparse.ArgumentParser(add_help=False)
+    shared.add_argument(
+        "--config-dir",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "Override config directory (default: ~/.config/shizen_lec_helper/). "
+            "Env var: SLH_CONFIG_DIR."
+        ),
+    )
+    shared.add_argument(
+        "--base-path",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help=(
+            "Override base path for downloaded materials (default: ~/Shizenkan/). "
+            "Env var: SLH_BASE_PATH."
+        ),
+    )
+    return shared
+
+
 def build_argument_parser() -> argparse.ArgumentParser:
-    """Build the top-level argument parser."""
+    """Build the top-level argument parser with global isolation flags.
+
+    --config-dir and --base-path are available on the top-level parser AND
+    on every subcommand parser (via parents=[isolation_flags]) so that
+    `./run.sh status --help` shows them explicitly.
+    """
+    isolation_flags = _build_isolation_flags_parser()
+
     parser = argparse.ArgumentParser(
-        prog="python -m shizenkan_lite",
-        description="shizenkan-lite: Lightweight SOS (Moodle) sync tool for Shizenkan MBA students.",
+        prog="python -m shizen_lec_helper",
+        description="shizen_lec_helper: Lightweight SOS (Moodle) sync tool for Shizenkan MBA students.",
+        parents=[isolation_flags],
     )
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Enable debug logging.")
+
     subparsers = parser.add_subparsers(dest="command", metavar="COMMAND")
 
     # setup
-    setup_parser = subparsers.add_parser("setup", help="First-time setup (token + config).")
+    setup_parser = subparsers.add_parser(
+        "setup",
+        help="First-time setup (token + config).",
+        parents=[isolation_flags],
+    )
     setup_parser.add_argument("--force", action="store_true",
                                help="Re-run setup even if token/config already exist.")
 
     # sync
-    sync_parser = subparsers.add_parser("sync", help="Sync course files from SOS.")
+    sync_parser = subparsers.add_parser(
+        "sync",
+        help="Sync course files from SOS.",
+        parents=[isolation_flags],
+    )
     sync_parser.add_argument("--dry-run", action="store_true",
                               help="Show what would be downloaded without writing files.")
 
     # deadlines
-    deadlines_parser = subparsers.add_parser("deadlines",
-                                              help="Show upcoming deadlines and update _deadlines.md.")
+    deadlines_parser = subparsers.add_parser(
+        "deadlines",
+        help="Show upcoming deadlines and update _deadlines.md.",
+        parents=[isolation_flags],
+    )
     deadlines_parser.add_argument("--dry-run", action="store_true",
                                    help="Print output without writing _deadlines.md.")
 
     # status
-    subparsers.add_parser("status", help="Show configuration and sync status.")
+    subparsers.add_parser(
+        "status",
+        help="Show configuration and sync status.",
+        parents=[isolation_flags],
+    )
 
     # courses
-    courses_parser = subparsers.add_parser("courses",
-                                            help="List enrolled courses with active status.")
+    courses_parser = subparsers.add_parser(
+        "courses",
+        help="List enrolled courses with active status.",
+        parents=[isolation_flags],
+    )
     courses_parser.add_argument("--auto-detect", action="store_true",
                                  help="Auto-detect active courses based on deadlines/updates.")
 

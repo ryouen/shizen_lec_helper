@@ -1,5 +1,5 @@
 [project]
-name = "shizenkan-lite"
+name = "shizen_lec_helper"
 version = "0.1.0"
 description = "Lightweight SOS (Moodle) sync tool for Shizenkan MBA students"
 requires-python = ">=3.10"
@@ -9,11 +9,11 @@ dependencies = [
 ]
 
 [project.scripts]
-shizenkan-lite = "shizenkan_lite.main:main"
+shizen_lec_helper = "shizen_lec_helper.main:main"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/shizenkan_lite"]
+packages = ["src/shizen_lec_helper"]

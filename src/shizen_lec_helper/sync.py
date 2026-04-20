@@ -51,13 +51,15 @@ class SyncResult:
 
 
 def sync_active_courses(sos: SOSClient, config: AppConfig,
-                        dry_run: bool = False) -> SyncResult:
+                        dry_run: bool = False,
+                        config_dir: "Path | str | None" = None) -> SyncResult:
     """Sync all active courses listed in config.active_courses.
 
     Args:
         sos: Authenticated SOS API client.
         config: App configuration.
         dry_run: If True, log what would be downloaded but don't write files.
+        config_dir: Optional config directory override for state isolation.
 
     Returns:
         SyncResult with per-course stats.
@@ -85,6 +87,7 @@ def sync_active_courses(sos: SOSClient, config: AppConfig,
                 base_path=config.base_path,
                 course_result=course_result,
                 dry_run=dry_run,
+                config_dir=config_dir,
             )
         except Exception as e:
             course_result.add_error(f"Unexpected error syncing {shortname}: {e}")
@@ -102,6 +105,7 @@ def _sync_single_course(
     base_path: Path,
     course_result: CourseSyncResult,
     dry_run: bool,
+    config_dir: "Path | str | None" = None,
 ) -> None:
     """Sync all files for a single course."""
     # Use short name for directory (e.g. FINANCE_EN_2027 → FINANCE_EN_2027/)
@@ -121,6 +125,7 @@ def _sync_single_course(
             course_shortname=course_shortname,
             course_result=course_result,
             dry_run=dry_run,
+            config_dir=config_dir,
         )
 
     # --- Assignment attachment files ---
@@ -135,6 +140,7 @@ def _sync_single_course(
                 course_shortname=course_shortname,
                 course_result=course_result,
                 dry_run=dry_run,
+                config_dir=config_dir,
             )
     except Exception as e:
         course_result.add_error(f"Error fetching assignment files for {course_shortname}: {e}")
@@ -153,13 +159,15 @@ def _download_file_if_needed(
     course_shortname: str,
     course_result: CourseSyncResult,
     dry_run: bool,
+    config_dir: "Path | str | None" = None,
 ) -> None:
     """Download a single Moodle file if not already synced."""
     safe_filename = _sanitize_filename(moodle_file.filename)
     # Relative path for state tracking
     relative_path = str(target_dir.name) + "/" + safe_filename
 
-    if is_file_synced(course_shortname, relative_path, moodle_file.time_modified):
+    if is_file_synced(course_shortname, relative_path, moodle_file.time_modified,
+                      config_dir=config_dir):
         course_result.files_skipped += 1
         logger.debug(f"Skip (up to date): {safe_filename}")
         return
@@ -179,6 +187,7 @@ def _download_file_if_needed(
             relative_path=relative_path,
             time_modified=moodle_file.time_modified,
             filesize=len(file_bytes),
+            config_dir=config_dir,
         )
         logger.info(f"Downloaded: {target_path}")
         course_result.files_downloaded += 1
