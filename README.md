@@ -201,16 +201,20 @@ python -m shizen_lec_helper sync
 
 ## Moodle token acquisition (non-interactive mode)
 
-When working with an AI agent, interactive prompts are not available. Use the credentials file method instead:
+When working with an AI agent, use the password file method:
 
-1. Create `~/.shizen_lec_creds` in your editor with:
+1. Create the password file in your editor — open `~/.shizen_lec_password`
+   and type just the password on one line, then save.
+2. Set permissions:
+   ```bash
+   chmod 600 ~/.shizen_lec_password
    ```
-   SOS_USERNAME=your.email@shizenkan.ac.jp
-   SOS_PASSWORD=your_password
+3. Run setup (replace `EMAIL` with your Moodle account email):
+   ```bash
+   python -m shizen_lec_helper setup --username EMAIL --creds-file ~/.shizen_lec_password
    ```
-2. Set permissions: `chmod 600 ~/.shizen_lec_creds`
-3. Run setup: `python -m shizen_lec_helper setup --creds-file ~/.shizen_lec_creds`
-4. The script overwrites and deletes the file regardless of success or failure.
+4. On success the file is deleted automatically. On failure it is kept so
+   you can fix the password and retry.
 
 See `AI_SETUP.md` Step 4 Method A for the detailed flow.
 
@@ -219,7 +223,7 @@ See `AI_SETUP.md` Step 4 Method A for the detailed flow.
 | Command | Description |
 |---------|-------------|
 | `python -m shizen_lec_helper setup` | First-time setup (interactive) |
-| `python -m shizen_lec_helper setup --creds-file PATH` | First-time setup (non-interactive) |
+| `python -m shizen_lec_helper setup --username EMAIL --creds-file PATH` | First-time setup (non-interactive) |
 | `python -m shizen_lec_helper sync` | Sync course materials and videos |
 | `python -m shizen_lec_helper sync --dry-run` | Preview downloads (no writes) |
 | `python -m shizen_lec_helper deadlines` | Show deadlines and update `_deadlines.md` |

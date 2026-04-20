@@ -10,7 +10,6 @@ run_token_setup_from_file(site_url, creds_path, config_dir) -- file-based full f
 """
 
 import getpass
-import json
 import logging
 import os
 import stat
@@ -32,9 +31,6 @@ TOKEN_REQUEST_TIMEOUT_SECONDS = 20
 
 # Octal permission mask for "group or other has any access" (i.e. not 600 or tighter)
 _PERMISSION_GROUP_OTHER_MASK = 0o077
-
-# Zero-fill block size for shredding credentials file in memory (bytes)
-_SHRED_BLOCK_SIZE = 4096
 
 
 def acquire_moodle_token(
@@ -143,6 +139,28 @@ def acquire_moodle_token_interactive(site_url: str = DEFAULT_SITE_URL) -> Moodle
         username = "\x00" * len(username)  # noqa: F841
 
 
+def _read_password_file(file_path: str) -> str:
+    """Read a password from a file (single line, trailing whitespace stripped).
+
+    Supports files with or without trailing newline.
+
+    Args:
+        file_path: Absolute path to the password file.
+
+    Returns:
+        The password string with surrounding whitespace removed.
+
+    Raises:
+        ValueError: If the file is empty or contains only whitespace.
+    """
+    with open(file_path, "r", encoding="utf-8") as fh:
+        content = fh.read()
+    password = content.strip()
+    if not password:
+        raise ValueError(f"Password file is empty: {file_path}")
+    return password
+
+
 def _parse_env_style_credentials(file_path: str) -> dict[str, str]:
     """Parse a KEY=VALUE credentials file (dotenv-style).
 
@@ -180,6 +198,34 @@ def _parse_env_style_credentials(file_path: str) -> dict[str, str]:
                 value = value[1:-1]
             parsed[key] = value
     return parsed
+
+
+def _shred_and_delete_credentials_file(creds_path: str) -> None:
+    """Overwrite the credentials file with null bytes, fsync, then delete it.
+
+    This is a best-effort measure against simple disk forensics on
+    macOS/Linux regular filesystems. It does not guarantee secure erasure
+    on SSDs with wear-levelling or copy-on-write filesystems.
+
+    Args:
+        creds_path: Path to the credentials file to shred.
+    """
+    try:
+        file_size = os.path.getsize(creds_path)
+        null_bytes = b"\x00" * file_size
+        with open(creds_path, "r+b") as fh:
+            fh.write(null_bytes)
+            try:
+                os.fsync(fh.fileno())
+            except OSError as fsync_err:
+                logger.warning("fsync failed (best-effort): %s", fsync_err)
+    except OSError as overwrite_err:
+        logger.warning("Could not overwrite credentials file: %s", overwrite_err)
+
+    try:
+        os.unlink(creds_path)
+    except OSError as unlink_err:
+        logger.warning("Could not delete credentials file: %s", unlink_err)
 
 
 def _verify_credentials_file_security(creds_path: str) -> None:
@@ -226,34 +272,6 @@ def _verify_credentials_file_security(creds_path: str) -> None:
         sys.exit(1)
 
 
-def _shred_and_delete_credentials_file(creds_path: str) -> None:
-    """Overwrite the credentials file with null bytes, fsync, then delete it.
-
-    This is a best-effort measure against simple disk forensics on
-    macOS/Linux regular filesystems. It does not guarantee secure erasure
-    on SSDs with wear-levelling or copy-on-write filesystems.
-
-    Args:
-        creds_path: Path to the credentials file to shred.
-    """
-    try:
-        file_size = os.path.getsize(creds_path)
-        null_bytes = b"\x00" * file_size
-        with open(creds_path, "r+b") as fh:
-            fh.write(null_bytes)
-            try:
-                os.fsync(fh.fileno())
-            except OSError as fsync_err:
-                logger.warning("fsync failed (best-effort): %s", fsync_err)
-    except OSError as overwrite_err:
-        logger.warning("Could not overwrite credentials file: %s", overwrite_err)
-
-    try:
-        os.unlink(creds_path)
-    except OSError as unlink_err:
-        logger.warning("Could not delete credentials file: %s", unlink_err)
-
-
 def acquire_moodle_token_from_file(
     site_url: str,
     creds_path: str,
@@ -264,7 +282,8 @@ def acquire_moodle_token_from_file(
     1. Validates file ownership and permissions (600 or tighter).
     2. Reads SOS_USERNAME and SOS_PASSWORD without echoing to stdout.
     3. Calls the Moodle token endpoint.
-    4. In try/finally: shreds and deletes the credentials file.
+    4. In try/finally: shreds and deletes the credentials file regardless of
+       success or failure.
 
     Args:
         site_url: Base URL of the Moodle site.
@@ -307,6 +326,7 @@ def acquire_moodle_token_from_file(
         # Clear credential variables from memory
         password = "\x00" * max(len(password), 1)  # noqa: F841
         username = "\x00" * max(len(username), 1)  # noqa: F841
+        # Shred and delete regardless of success or failure
         _shred_and_delete_credentials_file(creds_path)
 
 
