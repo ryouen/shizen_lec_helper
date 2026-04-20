@@ -65,11 +65,51 @@ pip install -r requirements.txt
 
 ---
 
-## Step 4: Moodleトークンの取得
+## Step 4: Moodleトークンの取得（2択）
+
+### 方式A: 非対話型（AIエージェント経由で実行する場合、推奨）
+
+**AIへの重要指示:**
+- このステップでは認証情報ファイルを経由します
+- ユーザーに作成してもらうファイルの中身（USERNAMEとPASSWORD）を
+  あなた（AI）は絶対にReadツール等で読まないでください
+- ユーザーに「自分のエディタで書いてください」と伝え、
+  あなたはファイルパスだけを受け取ってください
+- スクリプトがファイルを消去するので、後処理も不要です
+
+ユーザーへの指示（コピペ用）:
+「以下の内容のファイルを `~/.shizen_lec_creds` に作成してください（chmod 600にしてください）。
+このファイルの中身は私（AI）には見せないでください。
+
+  SOS_USERNAME=あなたのMoodleメールアドレス
+  SOS_PASSWORD=あなたのMoodleパスワード
+
+作成したら教えてください。次のコマンドを実行します。
+（スクリプトが成功/失敗に関わらずこのファイルを上書きして削除します）」
+
+実行:
+```bash
+chmod 600 ~/.shizen_lec_creds
+python -m shizen_lec_helper setup --creds-file ~/.shizen_lec_creds
+```
+
+このコマンドが以下を行います:
+1. ファイルの所有者・パーミッション（600以下）を検証
+2. SOS_USERNAME / SOS_PASSWORD を読み取り（標準出力に値は一切出力しません）
+3. Moodle APIでトークンを取得
+4. `core_webservice_get_site_info` で動作確認（ユーザー名・フルネームが表示されます）
+5. トークンを `~/.config/shizen_lec_helper/moodle-token.json` に保存（パーミッション600）
+6. 設定ファイル `~/.config/shizen_lec_helper/config.json` を生成
+7. 成功/失敗にかかわらず、認証情報ファイルをゼロ埋め上書き → fsync → 削除
+
+### 方式B: 対話型（ユーザーが自分のターミナルで実行する場合）
 
 ```bash
 python -m shizen_lec_helper setup
 ```
+
+ユーザーがTTY環境（Terminal.app等）で直接実行する場合のみ動きます。
+AIエージェントのBashツール経由ではTTYが繋がらず、EOFErrorになります。
 
 このコマンドが以下を行います:
 1. SOSのメールアドレスとパスワードを `getpass` で入力（パスワードは画面に表示されません）

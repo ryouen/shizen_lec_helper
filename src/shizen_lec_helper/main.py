@@ -332,6 +332,18 @@ def build_argument_parser() -> argparse.ArgumentParser:
     )
     setup_parser.add_argument("--force", action="store_true",
                                help="Re-run setup even if token/config already exist.")
+    setup_parser.add_argument(
+        "--creds-file",
+        metavar="PATH",
+        default=None,
+        help=(
+            "Path to a .env-style credentials file containing SOS_USERNAME and "
+            "SOS_PASSWORD. Skips interactive prompts. The file must be owned by "
+            "you and have permissions 600 or tighter. It is shredded and deleted "
+            "after use regardless of success or failure. "
+            "Example: python -m shizen_lec_helper setup --creds-file ~/.shizen_lec_creds"
+        ),
+    )
 
     # sync
     sync_parser = subparsers.add_parser(

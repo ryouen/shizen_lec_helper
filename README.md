@@ -60,11 +60,27 @@ python -m shizen_lec_helper courses --auto-detect
 python -m shizen_lec_helper sync
 ```
 
+## Moodleトークン取得（非対話モード）
+
+AIエージェントに手伝ってもらう場合、対話入力ができないので認証情報ファイル方式を使います:
+
+1. `~/.shizen_lec_creds` を以下の内容でエディタで作成:
+   ```
+   SOS_USERNAME=your.email@shizenkan.ac.jp
+   SOS_PASSWORD=your_password
+   ```
+2. パーミッション変更: `chmod 600 ~/.shizen_lec_creds`
+3. セットアップ実行: `python -m shizen_lec_helper setup --creds-file ~/.shizen_lec_creds`
+4. スクリプトが成功/失敗に関わらずファイルを上書き削除します
+
+詳細手順は `AI_SETUP.md` の「Step 4 方式A」を参照してください。
+
 ## 主なコマンド
 
 | コマンド | 説明 |
 |---------|------|
-| `python -m shizen_lec_helper setup` | 初回セットアップ |
+| `python -m shizen_lec_helper setup` | 初回セットアップ（対話型）|
+| `python -m shizen_lec_helper setup --creds-file PATH` | 初回セットアップ（非対話型）|
 | `python -m shizen_lec_helper sync` | 授業資料・動画を同期 |
 | `python -m shizen_lec_helper sync --dry-run` | DL対象の確認（書き込みなし） |
 | `python -m shizen_lec_helper deadlines` | 締切一覧＋`_deadlines.md`更新 |
@@ -183,11 +199,27 @@ python -m shizen_lec_helper courses --auto-detect
 python -m shizen_lec_helper sync
 ```
 
+## Moodle token acquisition (non-interactive mode)
+
+When working with an AI agent, interactive prompts are not available. Use the credentials file method instead:
+
+1. Create `~/.shizen_lec_creds` in your editor with:
+   ```
+   SOS_USERNAME=your.email@shizenkan.ac.jp
+   SOS_PASSWORD=your_password
+   ```
+2. Set permissions: `chmod 600 ~/.shizen_lec_creds`
+3. Run setup: `python -m shizen_lec_helper setup --creds-file ~/.shizen_lec_creds`
+4. The script overwrites and deletes the file regardless of success or failure.
+
+See `AI_SETUP.md` Step 4 Method A for the detailed flow.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `python -m shizen_lec_helper setup` | First-time setup |
+| `python -m shizen_lec_helper setup` | First-time setup (interactive) |
+| `python -m shizen_lec_helper setup --creds-file PATH` | First-time setup (non-interactive) |
 | `python -m shizen_lec_helper sync` | Sync course materials and videos |
 | `python -m shizen_lec_helper sync --dry-run` | Preview downloads (no writes) |
 | `python -m shizen_lec_helper deadlines` | Show deadlines and update `_deadlines.md` |
