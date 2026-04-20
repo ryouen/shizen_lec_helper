@@ -12,8 +12,6 @@ run_token_setup_from_file(site_url, username, creds_path, config_dir) -- file-ba
 import getpass
 import logging
 import os
-import stat
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,8 +27,23 @@ MOODLE_MOBILE_SERVICE = "moodle_mobile_app"
 # HTTP timeout for token acquisition requests (seconds)
 TOKEN_REQUEST_TIMEOUT_SECONDS = 20
 
-# Octal permission mask for "group or other has any access" (i.e. not 600 or tighter)
-_PERMISSION_GROUP_OTHER_MASK = 0o077
+# Default location for the password file (user-friendly: visible in Finder).
+DEFAULT_PASSWORD_FILE_PATH = "~/Downloads/moodle_password.txt"
+
+# Template shown to the user when the AI creates the password file.
+PASSWORD_FILE_TEMPLATE = """# Moodleのパスワードをここに入力して保存してください。
+# Put your Moodle password on the line below and save.
+#
+# 1. このファイルの一番下の行に、あなたのMoodleのパスワードだけを書いてください
+#    (On the last line, write only your Moodle password.)
+# 2. 保存したらAIに「できました」と伝えてください
+#    (Tell the AI "done" once you've saved.)
+# 3. 認証に成功すると、このファイルは自動的に削除されます
+#    (On successful login, this file will be deleted automatically.)
+# 4. 認証に失敗した場合はファイルが残るので、直して再実行できます
+#    (If login fails, the file stays so you can fix and retry.)
+
+"""
 
 
 def acquire_moodle_token(
@@ -124,11 +137,14 @@ def acquire_moodle_token_interactive(site_url: str = DEFAULT_SITE_URL) -> Moodle
     except EOFError:
         raise EOFError(
             "Interactive input is not available (probably running from an AI agent's "
-            "non-TTY shell). Please either:\n"
-            "  1. Run this command directly in your Terminal (not AI chat), or\n"
-            "  2. Use --creds-file PATH with a file containing SOS_USERNAME and "
-            "SOS_PASSWORD\n"
-            "     (see AI_SETUP.md for the non-interactive flow)."
+            "non-TTY shell). Please use the password-file flow instead:\n"
+            "  1. Run:  python -m shizen_lec_helper prep-password\n"
+            "     (creates a template file at ~/Downloads/moodle_password.txt)\n"
+            "  2. Open that file in TextEdit / Notepad and write your password\n"
+            "  3. Run:  python -m shizen_lec_helper setup --username EMAIL "
+            "--creds-file ~/Downloads/moodle_password.txt\n"
+            "\nAlternatively, run this command directly in your own Terminal "
+            "(not from the AI chat)."
         )
 
     try:
@@ -139,10 +155,30 @@ def acquire_moodle_token_interactive(site_url: str = DEFAULT_SITE_URL) -> Moodle
         username = "\x00" * len(username)  # noqa: F841
 
 
-def _read_password_file(file_path: str) -> str:
-    """Read a password from a file (single line, trailing whitespace stripped).
+def create_password_file_template(target_path: str = DEFAULT_PASSWORD_FILE_PATH) -> Path:
+    """Create a password file template at the given path for the user to fill in.
 
-    Supports files with or without trailing newline.
+    The template contains comment lines explaining what to do, then a blank
+    line at the bottom where the user should write their password.
+
+    Args:
+        target_path: Where to create the file (default: ~/Downloads/moodle_password.txt).
+
+    Returns:
+        The absolute Path where the file was created.
+    """
+    path = Path(target_path).expanduser().resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(PASSWORD_FILE_TEMPLATE, encoding="utf-8")
+    return path
+
+
+def _read_password_file(file_path: str) -> str:
+    """Read a password from a file, ignoring comment (#) and blank lines.
+
+    The password is taken as the first non-comment, non-blank line
+    (whitespace stripped). This lets the template file include
+    instructions that get skipped automatically.
 
     Args:
         file_path: Absolute path to the password file.
@@ -151,58 +187,19 @@ def _read_password_file(file_path: str) -> str:
         The password string with surrounding whitespace removed.
 
     Raises:
-        ValueError: If the file is empty or contains only whitespace.
+        FileNotFoundError: If the file does not exist.
+        ValueError: If the file contains no non-comment, non-blank line.
     """
     with open(file_path, "r", encoding="utf-8") as fh:
-        content = fh.read()
-    password = content.strip()
-    if not password:
-        raise ValueError(f"Password file is empty: {file_path}")
-    return password
-
-
-def _verify_credentials_file_security(creds_path: str) -> None:
-    """Check that the credentials file is safe to read.
-
-    Validates:
-    - File exists.
-    - File is owned by the current effective user.
-    - File permissions are 600 or tighter (no group/other access).
-
-    Args:
-        creds_path: Path to the credentials file.
-
-    Raises:
-        SystemExit: Calls sys.exit(1) if any check fails.
-    """
-    path = Path(creds_path)
-
-    if not path.exists():
-        print(
-            f"Error: Credentials file not found: {creds_path}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    file_stat = os.stat(creds_path)
-    current_uid = os.getuid()
-
-    if file_stat.st_uid != current_uid:
-        print(
-            f"Error: Credentials file is not owned by you (owner uid={file_stat.st_uid}, "
-            f"your uid={current_uid}): {creds_path}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    file_mode = stat.S_IMODE(file_stat.st_mode)
-    if file_mode & _PERMISSION_GROUP_OTHER_MASK:
-        print(
-            f"Error: File permissions too open ({oct(file_mode)}): {creds_path}\n"
-            f"       Run: chmod 600 {creds_path}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
+        for line in fh:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            return stripped
+    raise ValueError(
+        f"Password file contains no password line: {file_path}\n"
+        f"Add a line with just your password (no # at the start)."
+    )
 
 
 def acquire_moodle_token_from_file(
@@ -212,32 +209,34 @@ def acquire_moodle_token_from_file(
 ) -> MoodleToken:
     """Obtain a Moodle token using a username and a password file.
 
-    Security steps:
-    1. Validates file ownership and permissions (600 or tighter).
-    2. Reads the password from the file (one line, whitespace stripped).
-    3. Calls the Moodle token endpoint.
-    4. On success only: deletes the password file.
+    Flow:
+    1. Reads the password from the file (first non-comment, non-blank line).
+    2. Calls the Moodle token endpoint.
+    3. On success only: deletes the password file.
        On failure: leaves the file so the user can fix the password and retry.
+
+    No chmod / ownership check — this file is transient (deleted on success).
 
     Args:
         site_url: Base URL of the Moodle site.
         username: Moodle login email/username (passed via CLI flag).
-        creds_path: Path to the password file (one line containing the password).
+        creds_path: Path to the password file.
 
     Returns:
         MoodleToken populated with token, user_id, site_url, created_at.
 
     Raises:
         RuntimeError: If token acquisition fails. File is NOT deleted on failure.
-        ValueError: If the password file is empty.
-        SystemExit: If security checks fail (ownership / permissions).
+        FileNotFoundError: If the password file does not exist.
+        ValueError: If the password file has no password line.
     """
-    _verify_credentials_file_security(creds_path)
-    password = _read_password_file(creds_path)
+    resolved_path = str(Path(creds_path).expanduser())
+    password = _read_password_file(resolved_path)
 
     # Credentials intentionally not logged
     print(f"\nMoodle token acquisition for: {site_url}")
-    print("Reading password from file (not displayed).\n")
+    print(f"Reading password from: {resolved_path}")
+    print("(Password is not displayed.)\n")
 
     try:
         token = acquire_moodle_token(site_url, username, password)
@@ -247,8 +246,8 @@ def acquire_moodle_token_from_file(
 
     # Success: delete the password file (plain unlink; shred is unnecessary here).
     try:
-        os.unlink(creds_path)
-        print(f"Password file deleted: {creds_path}")
+        os.unlink(resolved_path)
+        print(f"Password file deleted: {resolved_path}")
     except OSError as unlink_err:
         logger.warning("Could not delete password file: %s", unlink_err)
 

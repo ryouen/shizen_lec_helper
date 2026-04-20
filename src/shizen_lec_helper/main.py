@@ -14,6 +14,7 @@ Global flags (available before any subcommand):
 
 import argparse
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -287,6 +288,43 @@ def _cmd_courses(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_prep_password(args: argparse.Namespace) -> int:
+    """Create a password file template for the user to fill in.
+
+    Writes a file with comment lines explaining what to do, then a blank
+    line at the bottom for the password. Optionally opens the file in the
+    user's default editor so they can type into it via Finder/Explorer.
+    """
+    import subprocess
+    import platform
+    from .token_setup import create_password_file_template, DEFAULT_PASSWORD_FILE_PATH
+
+    target = args.path or DEFAULT_PASSWORD_FILE_PATH
+    path = create_password_file_template(target)
+
+    print(f"\nPassword file created at:\n  {path}\n")
+    print("Next steps for the user:")
+    print("  1. Open this file (it should open automatically).")
+    print("  2. On the last line, type your Moodle password and save.")
+    print("  3. Tell the AI / run the setup command when ready.")
+    print()
+
+    if args.open:
+        system = platform.system()
+        try:
+            if system == "Darwin":
+                subprocess.run(["open", "-e", str(path)], check=False)
+            elif system == "Windows":
+                os.startfile(str(path))  # type: ignore[attr-defined]
+            else:
+                subprocess.run(["xdg-open", str(path)], check=False)
+        except Exception as open_err:
+            logger.warning("Could not auto-open editor: %s", open_err)
+            print(f"(Please open this file manually: {path})")
+
+    return 0
+
+
 def _build_isolation_flags_parser() -> argparse.ArgumentParser:
     """Build a shared parent parser containing the isolation flags.
 
@@ -401,6 +439,18 @@ def build_argument_parser() -> argparse.ArgumentParser:
     courses_parser.add_argument("--auto-detect", action="store_true",
                                  help="Auto-detect active courses based on deadlines/updates.")
 
+    # prep-password
+    prep_parser = subparsers.add_parser(
+        "prep-password",
+        help="Create a password file template in Downloads for the user to fill in.",
+    )
+    prep_parser.add_argument("--path", metavar="PATH", default=None,
+                              help="Where to create the file (default: ~/Downloads/moodle_password.txt).")
+    prep_parser.add_argument("--open", action="store_true", default=True,
+                              help="Open the file in the default editor after creating (default: True).")
+    prep_parser.add_argument("--no-open", dest="open", action="store_false",
+                              help="Do not open the file after creating.")
+
     return parser
 
 
@@ -417,6 +467,7 @@ def main() -> int:
         "deadlines": _cmd_deadlines,
         "status": _cmd_status,
         "courses": _cmd_courses,
+        "prep-password": _cmd_prep_password,
     }
 
     if not args.command:

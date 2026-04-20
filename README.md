@@ -60,29 +60,30 @@ python -m shizen_lec_helper courses --auto-detect
 python -m shizen_lec_helper sync
 ```
 
-## Moodleトークン取得（非対話モード）
+## Moodleトークン取得（AIに手伝ってもらう場合）
 
-AIエージェントに手伝ってもらう場合は、パスワードファイル経由の方式を使います:
+対話入力ができないAI環境では、以下の3ステップでトークンを取得します:
 
-1. パスワードを保存するファイルを作成:
-   エディタで `~/.shizen_lec_password` を開き、パスワードを1行だけ入力して保存
-2. パーミッション変更:
+1. パスワード記入用ファイルをダウンロードフォルダに作成:
    ```bash
-   chmod 600 ~/.shizen_lec_password
+   python -m shizen_lec_helper prep-password
    ```
-3. セットアップ実行（`EMAIL` は自分のMoodleアカウント）:
+   → `~/Downloads/moodle_password.txt` が自動で作成・テキストエディタで開かれます
+2. エディタでファイルの一番下の空行にパスワードを入力して保存（コメント行は触らなくてOK）
+3. セットアップ実行（`EMAIL` は自分のMoodleアカウントのメアド）:
    ```bash
-   python -m shizen_lec_helper setup --username EMAIL --creds-file ~/.shizen_lec_password
+   python -m shizen_lec_helper setup --username EMAIL --creds-file ~/Downloads/moodle_password.txt
    ```
-4. 成功するとファイルが自動削除されます。失敗時は残るので、
-   パスワードを修正して再実行できます。
 
-詳細手順は `AI_SETUP.md` の「Step 4 方式A」を参照してください。
+成功するとパスワードファイルは自動削除されます。失敗時は残るので、修正して再実行できます。
+
+詳細手順は `AI_SETUP.md` の「Step 4」を参照してください。
 
 ## 主なコマンド
 
 | コマンド | 説明 |
 |---------|------|
+| `python -m shizen_lec_helper prep-password` | パスワード記入用ファイルをDownloadsに作成 |
 | `python -m shizen_lec_helper setup` | 初回セットアップ（対話型）|
 | `python -m shizen_lec_helper setup --username EMAIL --creds-file PATH` | 初回セットアップ（非対話型）|
 | `python -m shizen_lec_helper sync` | 授業資料・動画を同期 |
@@ -203,29 +204,31 @@ python -m shizen_lec_helper courses --auto-detect
 python -m shizen_lec_helper sync
 ```
 
-## Moodle token acquisition (non-interactive mode)
+## Moodle token acquisition (when an AI is helping)
 
-When working with an AI agent, use the password file method:
+In AI environments where interactive input isn't available, use this 3-step flow:
 
-1. Create the password file in your editor — open `~/.shizen_lec_password`
-   and type just the password on one line, then save.
-2. Set permissions:
+1. Create a password file in your Downloads folder:
    ```bash
-   chmod 600 ~/.shizen_lec_password
+   python -m shizen_lec_helper prep-password
    ```
+   → Creates `~/Downloads/moodle_password.txt` and opens it in your default editor.
+2. Type your password on the blank line at the bottom of the file and save.
+   (The comment lines starting with `#` can be left as-is — they're ignored.)
 3. Run setup (replace `EMAIL` with your Moodle account email):
    ```bash
-   python -m shizen_lec_helper setup --username EMAIL --creds-file ~/.shizen_lec_password
+   python -m shizen_lec_helper setup --username EMAIL --creds-file ~/Downloads/moodle_password.txt
    ```
-4. On success the file is deleted automatically. On failure it is kept so
-   you can fix the password and retry.
 
-See `AI_SETUP.md` Step 4 Method A for the detailed flow.
+On success the file is deleted automatically. On failure it's kept so you can fix the password and retry.
+
+See `AI_SETUP.md` Step 4 for the detailed flow.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
+| `python -m shizen_lec_helper prep-password` | Create a password entry file in Downloads |
 | `python -m shizen_lec_helper setup` | First-time setup (interactive) |
 | `python -m shizen_lec_helper setup --username EMAIL --creds-file PATH` | First-time setup (non-interactive) |
 | `python -m shizen_lec_helper sync` | Sync course materials and videos |

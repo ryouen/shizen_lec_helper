@@ -65,73 +65,58 @@ pip install -r requirements.txt
 
 ---
 
-## Step 4: Moodleトークンの取得（2択）
-
-### 方式A: 非対話型（AIエージェント経由で実行する場合、推奨）
+## Step 4: Moodleトークンの取得
 
 **AIへの重要指示:**
-- このステップではパスワードのみを記載したファイルを経由します
-- ユーザーに作成してもらうファイルの中身（パスワード）を
-  あなた（AI）はReadツール等で**絶対に開かないでください**
-- ユーザー名（メールアドレス）はチャットで聞いて差し支えありません（機密ではない）
-- パスワードのみファイル経由で受け取ります
-- ユーザーに「自分のエディタでパスワードを書いてください」と伝え、
-  あなたはファイルパスとユーザー名だけを受け取ってください
-- スクリプトは成功時にファイルを削除します（失敗時は残ります）
+- ユーザー名（Moodleのメールアドレス）は普通にチャットで聞いてください。機密ではありません。
+- パスワードは、ユーザーがローカルファイルに書き込み、それをスクリプトが読みます。**AIはそのファイルを Read ツール等で絶対に開かないでください。**
+- ファイルは成功時に自動で削除されます（失敗時は残るので再試行できます）。
+- ユーザーに `chmod` など難しいコマンドを一切求めないでください。
 
-ユーザーへの指示（コピペ用）:
+### 手順
 
----
-Moodleへの自動アクセスには、Moodleトークンの発行が必要です。
-トークン発行を明示的に許可する場合、以下のファイルを開き、
-パスワードを1行で入力してください:
+**① ユーザー名を聞く:**
+> あなたのMoodleのログインメールアドレスを教えてください。
 
-  ~/.shizen_lec_password
-
-保存したら教えてください。次のコマンドで、あなたのユーザー名
-({USERNAME}) とこのファイルのパスワードを使ってトークンを発行し、
-成功したらファイルを削除します（失敗した場合はファイルを残す
-ので、パスワードを修正して再実行できます）:
-
-  chmod 600 ~/.shizen_lec_password
-  python -m shizen_lec_helper setup --username {USERNAME} --creds-file ~/.shizen_lec_password
-
----
-
-`{USERNAME}` はユーザーのMoodleメールアドレスに置き換えてください。
-
-実行するコマンドの例（ユーザー名が `student@example.com` の場合）:
+**② パスワード記入用ファイルを作成（1コマンド）:**
 ```bash
-chmod 600 ~/.shizen_lec_password
-python -m shizen_lec_helper setup --username student@example.com --creds-file ~/.shizen_lec_password
+python -m shizen_lec_helper prep-password
+```
+このコマンドは `~/Downloads/moodle_password.txt` を作り、テキストエディタで自動的に開きます。ファイルには記入手順のコメントが入っています。
+
+**③ ユーザーに以下を伝える（コピペ用）:**
+
+> ダウンロードフォルダに `moodle_password.txt` を作成し、テキストエディタで自動的に開きました。
+> 
+> ファイルの **一番下の空行** に、あなたのMoodleのパスワードだけを入力して、保存してください（⌘+Sまたは Ctrl+S）。
+> 
+> ※ コメント行（`#` で始まる行）はそのままで構いません。スクリプトが自動で無視します。
+> 
+> 保存できたら「できました」と教えてください。
+
+**④ ユーザーが「できました」と言ったら、setup を実行:**
+```bash
+python -m shizen_lec_helper setup --username {USERNAME} --creds-file ~/Downloads/moodle_password.txt
 ```
 
-このコマンドが以下を行います:
-1. ファイルの所有者・パーミッション（600以下）を検証
-2. ファイルからパスワードを読み取り（標準出力に値は一切出力しません）
-3. Moodle APIでトークンを取得
-4. `core_webservice_get_site_info` で動作確認（ユーザー名・フルネームが表示されます）
-5. トークンを `~/.config/shizen_lec_helper/moodle-token.json` に保存（パーミッション600）
-6. 設定ファイル `~/.config/shizen_lec_helper/config.json` を生成
-7. **成功時のみ** パスワードファイルを削除（失敗時はファイルを残す）
+`{USERNAME}` はStep①で聞いたメールアドレスに置き換えてください。
 
-### 方式B: 対話型（ユーザーが自分のターミナルで実行する場合）
+このコマンドが以下を行います:
+1. ファイルからパスワード行を読み取り（標準出力には値を一切出しません）
+2. Moodle APIでトークンを取得
+3. 動作確認（ユーザー名・フルネームが表示されます）
+4. トークンを `~/.config/shizen_lec_helper/moodle-token.json` に保存
+5. 設定ファイル `~/.config/shizen_lec_helper/config.json` を生成
+6. **成功時のみ** `~/Downloads/moodle_password.txt` を削除
+
+失敗した場合（パスワード間違い等）はファイルが残るので、ユーザーにもう一度エディタで開いて修正してもらい、同じ setup コマンドを再実行するだけでOKです。
+
+### 代替: ユーザーが自分のターミナルで対話的に実行する場合
 
 ```bash
 python -m shizen_lec_helper setup
 ```
-
-ユーザーがTTY環境（Terminal.app等）で直接実行する場合のみ動きます。
-AIエージェントのBashツール経由ではTTYが繋がらず、EOFErrorになります。
-
-このコマンドが以下を行います:
-1. SOSのメールアドレスとパスワードを `getpass` で入力（パスワードは画面に表示されません）
-2. Moodle APIでトークンを取得
-3. `core_webservice_get_site_info` で動作確認（ユーザー名・フルネームが表示されます）
-4. トークンを `~/.config/shizen_lec_helper/moodle-token.json` に保存（パーミッション600）
-5. 設定ファイル `~/.config/shizen_lec_helper/config.json` を生成
-
-**パスワードはディスクに書き込まれません。**
+Terminal.app等のTTYで直接実行する場合のみ動作します。AIエージェントのBash経由ではEOFErrorになるので、上記手順を使ってください。
 
 ---
 
