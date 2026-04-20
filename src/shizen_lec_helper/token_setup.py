@@ -176,9 +176,14 @@ def create_password_file_template(target_path: str = DEFAULT_PASSWORD_FILE_PATH)
 def _read_password_file(file_path: str) -> str:
     """Read a password from a file, ignoring comment (#) and blank lines.
 
-    The password is taken as the first non-comment, non-blank line
-    (whitespace stripped). This lets the template file include
-    instructions that get skipped automatically.
+    The file must contain exactly one non-comment, non-blank line (the
+    password). Surrounding whitespace on that line is stripped. Comment
+    lines begin with '#' (ignoring leading whitespace).
+
+    This strictness protects against common mistakes such as:
+    - Leaving placeholder text (e.g. "← ここに書く") above the password
+    - Accidentally adding extra text below the password
+    - Writing the password on more than one line
 
     Args:
         file_path: Absolute path to the password file.
@@ -188,18 +193,29 @@ def _read_password_file(file_path: str) -> str:
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        ValueError: If the file contains no non-comment, non-blank line.
+        ValueError: If the file contains 0 or >1 non-comment, non-blank lines.
     """
+    candidate_lines: list[str] = []
     with open(file_path, "r", encoding="utf-8") as fh:
         for line in fh:
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
-            return stripped
-    raise ValueError(
-        f"Password file contains no password line: {file_path}\n"
-        f"Add a line with just your password (no # at the start)."
-    )
+            candidate_lines.append(stripped)
+
+    if not candidate_lines:
+        raise ValueError(
+            f"Password file contains no password line: {file_path}\n"
+            f"Add a line with just your password (no '#' at the start)."
+        )
+    if len(candidate_lines) > 1:
+        raise ValueError(
+            f"Password file contains multiple non-comment lines ({len(candidate_lines)}): "
+            f"{file_path}\n"
+            f"Please leave only ONE line with your password. "
+            f"Delete placeholder text or any extra lines, then save again."
+        )
+    return candidate_lines[0]
 
 
 def acquire_moodle_token_from_file(
