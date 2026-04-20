@@ -8,6 +8,7 @@ the token to ~/.config/shizen_lec_helper/moodle-token.json.
 import getpass
 import json
 import logging
+import sys
 from datetime import datetime, timezone
 
 import requests
