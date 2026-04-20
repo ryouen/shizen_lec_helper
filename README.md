@@ -1,32 +1,20 @@
 # shizen_lec_helper
 
-シゼンカンMBAのSOS（Moodle）から授業資料・動画を自動ダウンロードし、締切一覧をMarkdownで管理する軽量ツール。
-A lightweight tool that automatically downloads course materials and videos from Shizenkan MBA's SOS (Moodle), and manages deadlines as Markdown.
+Moodleから授業資料・動画を自動ダウンロードし、締切一覧をMarkdownで管理する軽量ツール。
+A lightweight tool that auto-downloads course materials and videos from Moodle, and manages deadlines as Markdown.
 
 Claude Code / Gemini CLI / Codex / ChatGPT など、どのAIエージェントとも組み合わせて使えます。
 Works with any AI agent: Claude Code, Gemini CLI, Codex, ChatGPT, etc.
 
 ---
 
-## ⚠️ 利用上の注意 / Usage Notice
+**日本語:** 本ツールはMoodleで学習する学生が自分の履修コースの資料を個人学習用にローカル保存することを想定しています。大学・コース・教員が本ツールのような利用を禁止している場合は、それに従ってください。
 
-**日本語:**
-本ツールはシゼンカンMBAの受講生が**自分の履修コースの資料を個人学習用にローカル保存する**ことを想定しています。大学・コース・教員が以下のいずれかを明示的に禁止している場合は、必ずその規則を優先してください：
+本ツールを使って取得した資料を第三者に再配布することは禁止です。本ツールの使用によって生じたいかなる規則違反・不利益についても、作者は責任を負いません。
 
-- 授業資料のダウンロードやローカル保存
-- 授業内容・資料・動画を AI ツールに入力すること
-- 動画の複製・保存・再生成
+**English:** This tool is intended for students learning on Moodle to locally save materials from their own enrolled courses for personal study. If your university, course, or instructor prohibits this kind of use, please follow their rules.
 
-不明な場合は担当教員・学務課に事前確認のうえ使用してください。本ツールを使って取得した資料を第三者に再配布することは禁止です。本ツールの使用によって生じたいかなる規則違反・不利益についても、作者は責任を負いません。
-
-**English:**
-This tool is intended for Shizenkan MBA students to **download materials from their own enrolled courses for personal study**. If your university, course, or instructor explicitly prohibits any of the following, their rules take precedence:
-
-- Downloading or storing course materials locally
-- Feeding course content / materials / videos into AI tools
-- Copying, storing, or regenerating lecture videos
-
-When in doubt, check with your instructor or registrar before using this tool. Redistributing materials obtained through this tool to third parties is prohibited. The author assumes no responsibility for any rule violations or adverse consequences resulting from the use of this tool.
+Redistributing materials obtained through this tool to third parties is prohibited. The author assumes no responsibility for any rule violations or adverse consequences resulting from the use of this tool.
 
 ---
 
