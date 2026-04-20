@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # smoke_test.sh — Isolated smoke tests for shizen_lec_helper
 #
-# Tests run in /tmp/slh_test/ so they never touch:
-#   - ~/.config/shizen_lec_helper/  (production config)
-#   - ~/Shizenkan/                  (production data)
-#   - ~/.config/ai-agent/           (other system credentials)
+# Tests run in /tmp/slh_test/ so they never touch your production
+# ~/.config/shizen_lec_helper/ or ~/Shizenkan/ directories.
+#
+# Requires: an existing Moodle token at one of the known locations.
+# Run `python -m shizen_lec_helper setup` first if you don't have one.
 #
 # Steps:
 #   1. Create isolated environment at /tmp/slh_test/
-#   2. Copy existing ~/.config/ai-agent/credentials/moodle-token.json
-#   3. Run each CLI command with --config-dir and --base-path flags
+#   2. Copy an existing Moodle token (read-only)
+#   3. Run each CLI command against the isolated env
 #   4. Remove /tmp/slh_test/ on exit (trap)
 
 set -euo pipefail
@@ -17,7 +18,17 @@ set -euo pipefail
 TEST_DIR="/tmp/slh_test"
 TEST_CONFIG="$TEST_DIR/config"
 TEST_BASE="$TEST_DIR/Shizenkan"
-EXISTING_TOKEN="$HOME/.config/ai-agent/credentials/moodle-token.json"
+
+# Prefer lite's own token; fall back to author's legacy shizenkan location.
+if [ -f "$HOME/.config/shizen_lec_helper/moodle-token.json" ]; then
+    EXISTING_TOKEN="$HOME/.config/shizen_lec_helper/moodle-token.json"
+elif [ -f "$HOME/.config/ai-agent/credentials/moodle-token.json" ]; then
+    EXISTING_TOKEN="$HOME/.config/ai-agent/credentials/moodle-token.json"
+else
+    echo "ERROR: No Moodle token found." >&2
+    echo "Run 'python -m shizen_lec_helper setup' first." >&2
+    exit 1
+fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 cleanup() {
@@ -29,12 +40,7 @@ trap cleanup EXIT
 echo "[1/6] Creating isolated test environment at $TEST_DIR"
 mkdir -p "$TEST_CONFIG" "$TEST_BASE"
 
-if [ ! -f "$EXISTING_TOKEN" ]; then
-    echo "ERROR: $EXISTING_TOKEN not found. Cannot reuse token."
-    exit 1
-fi
-
-echo "[2/6] Copying existing Moodle token to test config"
+echo "[2/6] Copying Moodle token from $EXISTING_TOKEN"
 cp "$EXISTING_TOKEN" "$TEST_CONFIG/moodle-token.json"
 
 echo "[3/6] Generating minimal test config"
