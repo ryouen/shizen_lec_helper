@@ -10,12 +10,12 @@ Claude Code、Gemini CLI、Codex、ChatGPTなど、どのAIエージェントと
 
 ### A. Git でクローン（推奨）
 ```bash
-git clone https://github.com/[user]/shizen_lec_helper.git
+git clone https://github.com/ryouen/shizen_lec_helper.git
 cd shizen_lec_helper
 ```
 
 ### B. Zip ダウンロード
-1. https://github.com/[user]/shizen_lec_helper の緑の「Code」ボタン
+1. https://github.com/ryouen/shizen_lec_helper の緑の「Code」ボタン
 2. 「Download ZIP」を選択
 3. 解凍して好きな場所に置く
 
