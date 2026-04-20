@@ -1,0 +1,8 @@
+{
+  "site_url": "https://campus.shizenkan.ac.jp",
+  "base_path": "~/Shizenkan",
+  "active_courses": ["FINANCE_EN_2027", "MARKETING_EN_2027"],
+  "download_videos": true,
+  "new_course_policy": "ask",
+  "notification_format": "markdown"
+}
