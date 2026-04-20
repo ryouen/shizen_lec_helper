@@ -27,6 +27,10 @@ MOODLE_MOBILE_SERVICE = "moodle_mobile_app"
 # HTTP timeout for token acquisition requests (seconds)
 TOKEN_REQUEST_TIMEOUT_SECONDS = 20
 
+# Max candidate lines to try from a password file (guard against accidental
+# giant files that would spam the Moodle login endpoint).
+MAX_PASSWORD_CANDIDATES = 5
+
 # Default location for the password file (user-friendly: visible in Finder).
 DEFAULT_PASSWORD_FILE_PATH = "~/Downloads/moodle_password.txt"
 
@@ -173,49 +177,43 @@ def create_password_file_template(target_path: str = DEFAULT_PASSWORD_FILE_PATH)
     return path
 
 
-def _read_password_file(file_path: str) -> str:
-    """Read a password from a file, ignoring comment (#) and blank lines.
+def _read_password_candidates(file_path: str) -> list[str]:
+    """Read all non-comment, non-blank lines from a password file.
 
-    The file must contain exactly one non-comment, non-blank line (the
-    password). Surrounding whitespace on that line is stripped. Comment
-    lines begin with '#' (ignoring leading whitespace).
+    Comment lines start with '#' (after leading whitespace). Blank lines
+    (empty or whitespace-only) are skipped. All other lines are returned
+    in file order as candidate passwords — the caller tries each until
+    one succeeds.
 
-    This strictness protects against common mistakes such as:
-    - Leaving placeholder text (e.g. "← ここに書く") above the password
-    - Accidentally adding extra text below the password
-    - Writing the password on more than one line
+    This forgiving approach handles common user mistakes like leaving
+    placeholder text (e.g. "← ここに書く") above the real password:
+    the authentication layer simply tries both and the wrong one fails
+    harmlessly.
 
     Args:
         file_path: Absolute path to the password file.
 
     Returns:
-        The password string with surrounding whitespace removed.
+        List of candidate password strings (whitespace stripped), in file order.
 
     Raises:
         FileNotFoundError: If the file does not exist.
-        ValueError: If the file contains 0 or >1 non-comment, non-blank lines.
+        ValueError: If the file contains no non-comment, non-blank line.
     """
-    candidate_lines: list[str] = []
+    candidates: list[str] = []
     with open(file_path, "r", encoding="utf-8") as fh:
         for line in fh:
             stripped = line.strip()
             if not stripped or stripped.startswith("#"):
                 continue
-            candidate_lines.append(stripped)
+            candidates.append(stripped)
 
-    if not candidate_lines:
+    if not candidates:
         raise ValueError(
             f"Password file contains no password line: {file_path}\n"
             f"Add a line with just your password (no '#' at the start)."
         )
-    if len(candidate_lines) > 1:
-        raise ValueError(
-            f"Password file contains multiple non-comment lines ({len(candidate_lines)}): "
-            f"{file_path}\n"
-            f"Please leave only ONE line with your password. "
-            f"Delete placeholder text or any extra lines, then save again."
-        )
-    return candidate_lines[0]
+    return candidates
 
 
 def acquire_moodle_token_from_file(
@@ -226,12 +224,19 @@ def acquire_moodle_token_from_file(
     """Obtain a Moodle token using a username and a password file.
 
     Flow:
-    1. Reads the password from the file (first non-comment, non-blank line).
-    2. Calls the Moodle token endpoint.
-    3. On success only: deletes the password file.
-       On failure: leaves the file so the user can fix the password and retry.
+    1. Reads ALL non-comment, non-blank lines as password candidates.
+    2. Tries each candidate against the Moodle login endpoint.
+    3. First candidate that authenticates successfully wins.
+    4. On any success: deletes the password file.
+       On all-candidates-fail: leaves the file so the user can fix and retry.
 
-    No chmod / ownership check — this file is transient (deleted on success).
+    Multiple candidates are useful when users forget to delete placeholder
+    text like "← ここに書く" and add their real password on a separate line.
+    We try each harmlessly instead of forcing the user to clean up the file.
+
+    Capped at MAX_PASSWORD_CANDIDATES to avoid spamming the Moodle endpoint.
+    Only Moodle "Invalid login" errors trigger retry with the next candidate;
+    network errors are raised immediately.
 
     Args:
         site_url: Base URL of the Moodle site.
@@ -242,32 +247,56 @@ def acquire_moodle_token_from_file(
         MoodleToken populated with token, user_id, site_url, created_at.
 
     Raises:
-        RuntimeError: If token acquisition fails. File is NOT deleted on failure.
+        RuntimeError: If all candidates fail auth, or on a non-auth error
+            (network, server). File is NOT deleted when this raises.
         FileNotFoundError: If the password file does not exist.
-        ValueError: If the password file has no password line.
+        ValueError: If the password file has no candidate line, or > MAX.
     """
     resolved_path = str(Path(creds_path).expanduser())
-    password = _read_password_file(resolved_path)
+    candidates = _read_password_candidates(resolved_path)
 
-    # Credentials intentionally not logged
+    if len(candidates) > MAX_PASSWORD_CANDIDATES:
+        raise ValueError(
+            f"Password file has {len(candidates)} non-comment lines "
+            f"(maximum is {MAX_PASSWORD_CANDIDATES}): {resolved_path}\n"
+            f"Please remove extra lines (keep only your password and comment lines)."
+        )
+
     print(f"\nMoodle token acquisition for: {site_url}")
     print(f"Reading password from: {resolved_path}")
-    print("(Password is not displayed.)\n")
+    if len(candidates) > 1:
+        print(f"Found {len(candidates)} candidate lines; will try each until one works.")
+    print("(Password values are not displayed.)\n")
 
-    try:
-        token = acquire_moodle_token(site_url, username, password)
-    except Exception:
-        # Do NOT delete on failure — the user may want to retry after fixing the password.
-        raise
+    last_error: RuntimeError | None = None
+    for idx, password in enumerate(candidates, start=1):
+        if len(candidates) > 1:
+            print(f"Attempt {idx}/{len(candidates)}...")
+        try:
+            token = acquire_moodle_token(site_url, username, password)
+        except RuntimeError as e:
+            err_msg = str(e)
+            # Only retry on authentication failures. Network / server errors
+            # won't improve by trying another candidate — fail fast.
+            is_auth_failure = err_msg.startswith("Login failed:")
+            if not is_auth_failure:
+                raise
+            last_error = e
+            if idx < len(candidates):
+                print("  → Rejected by server, trying next candidate...")
+            continue
 
-    # Success: delete the password file (plain unlink; shred is unnecessary here).
-    try:
-        os.unlink(resolved_path)
-        print(f"Password file deleted: {resolved_path}")
-    except OSError as unlink_err:
-        logger.warning("Could not delete password file: %s", unlink_err)
+        # Success — delete the password file (plain unlink; shred unnecessary).
+        try:
+            os.unlink(resolved_path)
+            print(f"Password file deleted: {resolved_path}")
+        except OSError as unlink_err:
+            logger.warning("Could not delete password file: %s", unlink_err)
+        return token
 
-    return token
+    # All candidates exhausted with auth failures; do NOT delete the file.
+    assert last_error is not None  # guaranteed by len(candidates) >= 1
+    raise last_error
 
 
 def _verify_token_and_get_user_id(site_url: str, token: str) -> int:
