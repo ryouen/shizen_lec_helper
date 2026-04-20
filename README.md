@@ -1,10 +1,36 @@
 # shizen_lec_helper
 
-シゼンカンMBAのSOS（Moodle）から授業資料・動画を自動でダウンロードし、締切一覧をMarkdownで管理する軽量ツールです。
+シゼンカンMBAのSOS（Moodle）から授業資料・動画を自動ダウンロードし、締切一覧をMarkdownで管理する軽量ツール。
+A lightweight tool that automatically downloads course materials and videos from Shizenkan MBA's SOS (Moodle), and manages deadlines as Markdown.
 
-Claude Code、Gemini CLI、Codex、ChatGPTなど、どのAIエージェントとも組み合わせて使えます。
+Claude Code / Gemini CLI / Codex / ChatGPT など、どのAIエージェントとも組み合わせて使えます。
+Works with any AI agent: Claude Code, Gemini CLI, Codex, ChatGPT, etc.
 
 ---
+
+## ⚠️ 利用上の注意 / Usage Notice
+
+**日本語:**
+本ツールはシゼンカンMBAの受講生が**自分の履修コースの資料を個人学習用にローカル保存する**ことを想定しています。大学・コース・教員が以下のいずれかを明示的に禁止している場合は、必ずその規則を優先してください：
+
+- 授業資料のダウンロードやローカル保存
+- 授業内容・資料・動画を AI ツールに入力すること
+- 動画の複製・保存・再生成
+
+不明な場合は担当教員・学務課に事前確認のうえ使用してください。本ツールを使って取得した資料を第三者に再配布することは禁止です。本ツールの使用によって生じたいかなる規則違反・不利益についても、作者は責任を負いません。
+
+**English:**
+This tool is intended for Shizenkan MBA students to **download materials from their own enrolled courses for personal study**. If your university, course, or instructor explicitly prohibits any of the following, their rules take precedence:
+
+- Downloading or storing course materials locally
+- Feeding course content / materials / videos into AI tools
+- Copying, storing, or regenerating lecture videos
+
+When in doubt, check with your instructor or registrar before using this tool. Redistributing materials obtained through this tool to third parties is prohibited. The author assumes no responsibility for any rule violations or adverse consequences resulting from the use of this tool.
+
+---
+
+# 日本語
 
 ## 入手方法
 
@@ -19,66 +45,52 @@ cd shizen_lec_helper
 2. 「Download ZIP」を選択
 3. 解凍して好きな場所に置く
 
----
+## AIにセットアップしてもらう（推奨）
 
-## AIにセットアップしてもらう
-
-このツールのセットアップはAIエージェントに任せるのが最も簡単です。
-
-**Claude Code、Gemini CLI、ChatGPT等のAIに以下を伝えてください:**
+**Claude Code / Gemini CLI / ChatGPT 等のAIに以下を伝えてください:**
 
 > 「このフォルダの `AI_SETUP.md` を読んで、セットアップを手伝ってください」
 
-AIが環境チェックからMoodleトークン取得、初回同期まで案内してくれます。
-
----
+AIが環境チェックからMoodleトークン取得、初回同期まで案内します。
 
 ## 自分でセットアップする場合
 
-必要環境: Python 3.10以上
+必要環境: Python 3.10 以上
 
 ```bash
 # 依存パッケージのインストール
 pip install -r requirements.txt
-
-# または uv を使う場合
-uv pip install -r requirements.txt
+# または uv: uv pip install -r requirements.txt
 
 # セットアップ（Moodleトークン取得 + 設定ファイル生成）
 python -m shizen_lec_helper setup
 
-# コース一覧を確認
+# アクティブコースの自動検出
 python -m shizen_lec_helper courses --auto-detect
 
 # 同期実行
 python -m shizen_lec_helper sync
 ```
 
----
-
 ## 主なコマンド
 
 | コマンド | 説明 |
 |---------|------|
-| `python -m shizen_lec_helper setup` | 初回セットアップ（トークン取得 + 設定生成） |
+| `python -m shizen_lec_helper setup` | 初回セットアップ |
 | `python -m shizen_lec_helper sync` | 授業資料・動画を同期 |
-| `python -m shizen_lec_helper sync --dry-run` | ダウンロード対象の確認（書き込みなし） |
-| `python -m shizen_lec_helper deadlines` | 締切一覧を表示＆`_deadlines.md`を更新 |
-| `python -m shizen_lec_helper status` | 設定・最終同期日時・ディスク使用量を表示 |
-| `python -m shizen_lec_helper courses` | コース一覧とアクティブ判定を表示 |
+| `python -m shizen_lec_helper sync --dry-run` | DL対象の確認（書き込みなし） |
+| `python -m shizen_lec_helper deadlines` | 締切一覧＋`_deadlines.md`更新 |
+| `python -m shizen_lec_helper status` | 設定・最終同期・ディスク使用量 |
+| `python -m shizen_lec_helper courses` | コース一覧とアクティブ判定 |
 
 ### テスト隔離フラグ
 
-全コマンドで使えるグローバルフラグ:
-
 | フラグ | 環境変数 | デフォルト | 説明 |
 |--------|----------|---------|------|
-| `--config-dir PATH` | `SLH_CONFIG_DIR` | `~/.config/shizen_lec_helper/` | 設定・トークン・状態ファイルの場所を上書き |
-| `--base-path PATH` | `SLH_BASE_PATH` | `~/Shizenkan/` | ダウンロード先の場所を上書き |
+| `--config-dir PATH` | `SLH_CONFIG_DIR` | `~/.config/shizen_lec_helper/` | 設定ファイルの場所を上書き |
+| `--base-path PATH` | `SLH_BASE_PATH` | `~/Shizenkan/` | ダウンロード先を上書き |
 
-優先順位: CLIフラグ > 環境変数 > デフォルトパス
-
----
+優先順位: CLIフラグ > 環境変数 > デフォルト
 
 ## 保存先フォルダ構造
 
@@ -88,32 +100,20 @@ python -m shizen_lec_helper sync
 │   ├── Session 1 - Introduction/
 │   │   ├── slides.pdf
 │   │   └── assignment.pdf
-│   ├── Session 2 - .../
 │   ├── LEC_VIDEO/
 │   │   └── Lecture_Video_Session1.mp4
 │   └── _links.md
-├── MARKETING_EN_2027/
-│   └── ...
 └── _deadlines.md        ← 全コース横断の締切一覧
 ```
 
----
-
 ## 必要環境
 
-- **Python**: 3.10以上
-- **ストレージ**: 50GB以上の空き推奨
-  - 動画1本あたり約500〜900MB（中央値625MB）
-  - 1コースあたり3〜11GB
-  - 学期全体で10〜20GB超になることがあります
-- **動画ダウンロードに必要**: `yt-dlp`（自動インストール）、`ffmpeg`（Homebrewでインストール推奨）
-
-### ffmpegのインストール（Mac）
-```bash
-brew install ffmpeg
-```
-
----
+- **Python 3.10 以上**
+- **ストレージ 50GB 以上推奨**
+  - 動画1本 約 500〜900MB（中央値 625MB）
+  - 1コース 3〜11GB
+  - 学期全体で 10〜20GB 超になることがあります
+- **動画DLに必要**: `yt-dlp`（自動インストール）、`ffmpeg`（Mac: `brew install ffmpeg`）
 
 ## 設定ファイルの場所
 
@@ -123,6 +123,99 @@ brew install ffmpeg
 
 ---
 
-## ライセンス
+# English
+
+## Installation
+
+### A. Git clone (recommended)
+```bash
+git clone https://github.com/ryouen/shizen_lec_helper.git
+cd shizen_lec_helper
+```
+
+### B. Zip download
+1. Visit https://github.com/ryouen/shizen_lec_helper and click the green "Code" button
+2. Choose "Download ZIP"
+3. Unzip and place the folder wherever you like
+
+## Let an AI set it up for you (recommended)
+
+**Tell your AI (Claude Code / Gemini CLI / ChatGPT / etc.):**
+
+> "Please read `AI_SETUP.md` in this folder and help me set this up."
+
+The AI will guide you through environment checks, Moodle token acquisition, and your first sync.
+
+## Manual setup
+
+Required: Python 3.10+
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+# or with uv: uv pip install -r requirements.txt
+
+# First-time setup (Moodle token + config generation)
+python -m shizen_lec_helper setup
+
+# Auto-detect active courses
+python -m shizen_lec_helper courses --auto-detect
+
+# Run sync
+python -m shizen_lec_helper sync
+```
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `python -m shizen_lec_helper setup` | First-time setup |
+| `python -m shizen_lec_helper sync` | Sync course materials and videos |
+| `python -m shizen_lec_helper sync --dry-run` | Preview downloads (no writes) |
+| `python -m shizen_lec_helper deadlines` | Show deadlines and update `_deadlines.md` |
+| `python -m shizen_lec_helper status` | Show config, last sync, disk usage |
+| `python -m shizen_lec_helper courses` | List enrolled courses with active status |
+
+### Isolation flags
+
+| Flag | Env var | Default | Description |
+|------|---------|---------|-------------|
+| `--config-dir PATH` | `SLH_CONFIG_DIR` | `~/.config/shizen_lec_helper/` | Override config location |
+| `--base-path PATH` | `SLH_BASE_PATH` | `~/Shizenkan/` | Override download location |
+
+Precedence: CLI flag > env var > default
+
+## Folder structure
+
+```
+~/Shizenkan/
+├── FINANCE_EN_2027/
+│   ├── Session 1 - Introduction/
+│   │   ├── slides.pdf
+│   │   └── assignment.pdf
+│   ├── LEC_VIDEO/
+│   │   └── Lecture_Video_Session1.mp4
+│   └── _links.md
+└── _deadlines.md        ← cross-course deadline summary
+```
+
+## Requirements
+
+- **Python 3.10+**
+- **50GB+ free storage recommended**
+  - Per video: 500–900MB (median 625MB)
+  - Per course: 3–11GB
+  - Full semester: can exceed 10–20GB
+- **Required for video downloads**: `yt-dlp` (auto-installed), `ffmpeg` (Mac: `brew install ffmpeg`)
+
+## Config file locations
+
+- Config: `~/.config/shizen_lec_helper/config.json`
+- Token: `~/.config/shizen_lec_helper/moodle-token.json` (permissions 600, no password stored)
+- Sync state: `~/.config/shizen_lec_helper/state.json`
+
+---
+
+## License
 
 MIT License
